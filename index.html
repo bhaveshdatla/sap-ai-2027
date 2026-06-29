@@ -986,7 +986,7 @@ let state = {
   settings: { sbUrl: '', sbKey: '', demo: false }
 };
 
-let supabase = null;
+let _db = null; // renamed to avoid clash with window.supabase from CDN
 let currentNoteId = null;
 let saveTimer = null;
 let activeResourceFilter = '';
@@ -1041,10 +1041,16 @@ async function connectSupabase(silent = false) {
   if (!url || !key) { if(!silent) toast('Please enter both URL and Key', 'error'); return; }
 
   try {
-    supabase = window.supabase.createClient(url, key);
-    // Test connection
-    const { error } = await supabase.from('sap_progress').select('key').limit(1);
-    if (error) throw error;
+    const { createClient } = window.supabase;
+    _db = createClient(url, key);
+    // Test connection — if table missing, show helpful message
+    const { error } = await _db.from('sap_progress').select('key').limit(1);
+    if (error) {
+      if (error.code === '42P01' || (error.message && error.message.includes('does not exist'))) {
+        throw new Error('Table not found. Please run the SQL schema in Supabase SQL Editor first, then try again.');
+      }
+      throw error;
+    }
 
     state.settings = { sbUrl: url, sbKey: key, demo: false };
     localStorage.setItem('sap_settings', JSON.stringify(state.settings));
@@ -1070,7 +1076,7 @@ async function connectSupabase(silent = false) {
 
 async function loadFromSupabase() {
   const keys = ['topicStatus','checkIns','notes','resources','startDate'];
-  const { data, error } = await supabase.from('sap_progress').select('key,value').in('key', keys);
+  const { data, error } = await _db.from('sap_progress').select('key,value').in('key', keys);
   if (error) throw error;
   data.forEach(row => {
     if (row.key === 'startDate') state.startDate = row.value;
@@ -1087,9 +1093,9 @@ async function loadFromSupabase() {
 }
 
 async function saveToSupabase(key, value) {
-  if (!supabase) { saveLocally(); return; }
+  if (!_db) { saveLocally(); return; }
   try {
-    await supabase.from('sap_progress').upsert({ key, value, updated_at: new Date().toISOString() });
+    await _db.from('sap_progress').upsert({ key, value, updated_at: new Date().toISOString() });
     setSyncStatus('ok', 'Synced');
   } catch(e) {
     setSyncStatus('err', 'Sync error');
@@ -1117,7 +1123,7 @@ function loadLocalState() {
 }
 
 async function persistState(key) {
-  if (supabase) await saveToSupabase(key, state[key]);
+  if (_db) await saveToSupabase(key, state[key]);
   else saveLocally();
 }
 
