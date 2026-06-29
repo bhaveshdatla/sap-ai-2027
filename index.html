@@ -4,1758 +4,974 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SAP AI Expert — Learning Dashboard</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
-  /* ── TOKENS ─────────────────────────────────────────── */
-  :root {
-    --bg:        #0a0e1a;
-    --surface:   #111827;
-    --card:      #1a2234;
-    --border:    #1e2d47;
-    --accent:    #0ea5e9;
-    --accent2:   #06b6d4;
-    --green:     #22c55e;
-    --amber:     #f59e0b;
-    --red:       #ef4444;
-    --purple:    #a855f7;
-    --txt:       #e2e8f0;
-    --txt2:      #94a3b8;
-    --txt3:      #64748b;
-    --radius:    10px;
-    --shadow:    0 4px 24px rgba(0,0,0,.4);
-    --font:      'Inter', system-ui, sans-serif;
-  }
-
-  /* ── RESET ───────────────────────────────────────────── */
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html { scroll-behavior: smooth; }
-  body {
-    font-family: var(--font);
-    background: var(--bg);
-    color: var(--txt);
-    min-height: 100vh;
-    font-size: 14px;
-  }
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
-
-  /* ── SCROLLBAR ──────────────────────────────────────── */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: var(--surface); }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-  /* ── LAYOUT ─────────────────────────────────────────── */
-  .app { display: flex; flex-direction: column; min-height: 100vh; }
-
-  /* ── HEADER ─────────────────────────────────────────── */
-  .header {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 0 20px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    height: 56px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  .header-logo {
-    display: flex; align-items: center; gap: 10px;
-    font-weight: 700; font-size: 15px; letter-spacing: -.3px;
-    white-space: nowrap;
-  }
-  .logo-badge {
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    color: #fff; font-size: 10px; font-weight: 700;
-    padding: 3px 7px; border-radius: 5px; letter-spacing: .5px;
-  }
-  .header-sub { color: var(--txt3); font-size: 12px; }
-  .header-spacer { flex: 1; }
-  .sync-indicator {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 12px; color: var(--txt3);
-    cursor: pointer; padding: 5px 10px;
-    border-radius: 6px; border: 1px solid var(--border);
-    transition: all .2s;
-  }
-  .sync-indicator:hover { border-color: var(--accent); color: var(--accent); }
-  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--txt3); }
-  .sync-dot.ok { background: var(--green); animation: pulse 2s infinite; }
-  .sync-dot.err { background: var(--red); }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
-
-  /* ── NAV TABS ───────────────────────────────────────── */
-  .nav {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    overflow-x: auto;
-    scrollbar-width: none;
-    padding: 0 12px;
-  }
-  .nav::-webkit-scrollbar { display: none; }
-  .nav-tab {
-    padding: 12px 18px;
-    color: var(--txt3);
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    white-space: nowrap;
-    border-bottom: 2px solid transparent;
-    transition: all .2s;
-    display: flex; align-items: center; gap: 7px;
-    user-select: none;
-  }
-  .nav-tab:hover { color: var(--txt); }
-  .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-  .nav-tab .tab-icon { font-size: 15px; }
-
-  /* ── MAIN ───────────────────────────────────────────── */
-  .main { flex: 1; padding: 20px; max-width: 1400px; margin: 0 auto; width: 100%; }
-
-  /* ── PANELS ─────────────────────────────────────────── */
-  .panel { display: none; }
-  .panel.active { display: block; }
-
-  /* ── CARDS ──────────────────────────────────────────── */
-  .card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 20px;
-    box-shadow: var(--shadow);
-  }
-  .card-title {
-    font-size: 13px; font-weight: 600; color: var(--txt2);
-    text-transform: uppercase; letter-spacing: .7px; margin-bottom: 16px;
-    display: flex; align-items: center; gap: 8px;
-  }
-  .card-title span { color: var(--accent); }
-
-  /* ── GRID ───────────────────────────────────────────── */
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
-  .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
-
-  /* ── STAT TILES ─────────────────────────────────────── */
-  .stat-tile {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 18px 20px;
-    display: flex; flex-direction: column; gap: 6px;
-    position: relative; overflow: hidden;
-  }
-  .stat-tile::before {
-    content: ''; position: absolute; top: 0; left: 0;
-    width: 3px; height: 100%; background: var(--accent-color, var(--accent));
-  }
-  .stat-label { font-size: 11px; color: var(--txt3); text-transform: uppercase; letter-spacing: .6px; }
-  .stat-value { font-size: 28px; font-weight: 700; color: var(--txt); line-height: 1; }
-  .stat-sub { font-size: 12px; color: var(--txt2); }
-
-  /* ── PROGRESS BAR ───────────────────────────────────── */
-  .progress-bar {
-    height: 6px; background: var(--border); border-radius: 99px; overflow: hidden;
-    margin-top: 8px;
-  }
-  .progress-fill {
-    height: 100%; border-radius: 99px;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-    transition: width .6s ease;
-  }
-  .progress-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--txt3); margin-bottom: 4px; }
-
-  /* ── GANTT ──────────────────────────────────────────── */
-  .gantt-wrapper {
-    overflow-x: auto; border-radius: var(--radius);
-    background: var(--card); border: 1px solid var(--border);
-    padding: 16px;
-  }
-  .gantt-header { display: flex; margin-bottom: 8px; }
-  .gantt-label-col { width: 200px; min-width: 200px; font-size: 11px; color: var(--txt3); font-weight: 600; }
-  .gantt-months { display: flex; flex: 1; }
-  .gantt-month { font-size: 11px; color: var(--txt2); font-weight: 500; }
-  .gantt-row { display: flex; align-items: center; margin-bottom: 6px; position: relative; }
-  .gantt-row:hover .gantt-bar { filter: brightness(1.15); }
-  .gantt-task-name {
-    width: 200px; min-width: 200px; font-size: 12px; color: var(--txt2);
-    padding-right: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .gantt-track { flex: 1; height: 24px; background: var(--border); border-radius: 4px; position: relative; overflow: hidden; }
-  .gantt-bar {
-    position: absolute; height: 100%; border-radius: 4px;
-    display: flex; align-items: center; padding-left: 8px;
-    font-size: 10px; font-weight: 600; color: rgba(255,255,255,.9);
-    transition: filter .2s;
-    white-space: nowrap; overflow: hidden;
-  }
-  .gantt-today {
-    position: absolute; top: 0; bottom: 0; width: 2px;
-    background: var(--amber); z-index: 2; opacity: .8;
-  }
-
-  /* ── TOPICS ─────────────────────────────────────────── */
-  .phase-header {
-    display: flex; align-items: center; gap: 12px;
-    padding: 10px 0; cursor: pointer; user-select: none;
-  }
-  .phase-title { font-size: 14px; font-weight: 600; }
-  .phase-badge {
-    font-size: 10px; padding: 2px 8px; border-radius: 99px;
-    background: var(--border); color: var(--txt2); font-weight: 600;
-  }
-  .phase-progress-mini { flex: 1; height: 4px; background: var(--border); border-radius: 99px; overflow: hidden; }
-  .phase-chevron { color: var(--txt3); transition: transform .3s; font-size: 12px; }
-  .phase-chevron.open { transform: rotate(90deg); }
-  .topics-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 10px; padding: 8px 0 16px 0;
-  }
-  .topic-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 8px; padding: 14px; cursor: pointer;
-    transition: border-color .2s, transform .15s;
-    position: relative;
-  }
-  .topic-card:hover { border-color: var(--accent); transform: translateY(-1px); }
-  .topic-card.done { border-color: var(--green); }
-  .topic-card.done .topic-status { background: var(--green); }
-  .topic-card.inprogress { border-color: var(--amber); }
-  .topic-card.inprogress .topic-status { background: var(--amber); }
-  .topic-top { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
-  .topic-status {
-    width: 10px; height: 10px; border-radius: 50%; min-width: 10px;
-    background: var(--border); margin-top: 3px; transition: background .2s;
-  }
-  .topic-name { font-size: 13px; font-weight: 500; color: var(--txt); flex: 1; }
-  .topic-meta { display: flex; gap: 8px; flex-wrap: wrap; }
-  .tag {
-    font-size: 10px; padding: 2px 7px; border-radius: 4px;
-    background: var(--border); color: var(--txt2); font-weight: 500;
-  }
-  .tag.phase1 { background: rgba(14,165,233,.15); color: var(--accent); }
-  .tag.phase2 { background: rgba(168,85,247,.15); color: var(--purple); }
-  .tag.phase3 { background: rgba(34,197,94,.15); color: var(--green); }
-  .tag.phase4 { background: rgba(245,158,11,.15); color: var(--amber); }
-  .tag.phase5 { background: rgba(239,68,68,.15); color: var(--red); }
-  .topic-hrs { font-size: 11px; color: var(--txt3); margin-left: auto; }
-
-  /* ── STATUS BUTTONS ─────────────────────────────────── */
-  .btn { 
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 7px 14px; border-radius: 7px; font-size: 13px;
-    font-weight: 500; cursor: pointer; border: none; transition: all .2s;
-  }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-primary:hover { background: #0284c7; }
-  .btn-ghost { background: transparent; color: var(--txt2); border: 1px solid var(--border); }
-  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
-  .btn-danger { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid var(--red); }
-  .btn-success { background: rgba(34,197,94,.15); color: var(--green); border: 1px solid var(--green); }
-  .btn-sm { padding: 4px 10px; font-size: 11px; }
-
-  /* ── RESOURCES ──────────────────────────────────────── */
-  .resource-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
-  .filter-btn {
-    padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;
-    cursor: pointer; border: 1px solid var(--border); background: transparent;
-    color: var(--txt2); transition: all .2s;
-  }
-  .filter-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(14,165,233,.1); }
-  .resources-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-  .resource-item {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 8px;
-    transition: border-color .2s;
-  }
-  .resource-item:hover { border-color: var(--accent); }
-  .resource-top { display: flex; align-items: flex-start; gap: 10px; }
-  .resource-icon { font-size: 20px; }
-  .resource-title { font-size: 13px; font-weight: 600; color: var(--txt); flex: 1; }
-  .resource-desc { font-size: 12px; color: var(--txt2); line-height: 1.5; }
-  .resource-actions { display: flex; gap: 8px; margin-top: 4px; }
-  .resource-link {
-    font-size: 11px; color: var(--accent); text-decoration: none; font-weight: 500;
-    display: flex; align-items: center; gap: 4px;
-  }
-  .resource-link:hover { text-decoration: underline; }
-
-  /* ── NOTES ──────────────────────────────────────────── */
-  .notes-layout { display: grid; grid-template-columns: 260px 1fr; gap: 16px; min-height: 600px; }
-  .notes-sidebar {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 14px;
-    display: flex; flex-direction: column; gap: 8px;
-  }
-  .notes-list { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; flex: 1; }
-  .note-item {
-    padding: 10px 12px; border-radius: 7px; cursor: pointer;
-    transition: background .15s; border: 1px solid transparent;
-  }
-  .note-item:hover { background: var(--surface); }
-  .note-item.active { background: rgba(14,165,233,.1); border-color: rgba(14,165,233,.3); }
-  .note-item-title { font-size: 13px; font-weight: 500; color: var(--txt); margin-bottom: 2px; }
-  .note-item-date { font-size: 11px; color: var(--txt3); }
-  .note-item-tag { font-size: 10px; color: var(--accent); font-weight: 600; }
-  .notes-editor {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 20px;
-    display: flex; flex-direction: column; gap: 14px;
-  }
-  .note-title-input {
-    background: transparent; border: none; outline: none;
-    font-size: 20px; font-weight: 700; color: var(--txt); width: 100%;
-    font-family: var(--font);
-  }
-  .note-title-input::placeholder { color: var(--txt3); }
-  .note-toolbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 8px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-  .note-toolbar button {
-    padding: 4px 8px; border-radius: 5px; font-size: 12px; font-weight: 600;
-    cursor: pointer; border: 1px solid var(--border); background: transparent;
-    color: var(--txt2); transition: all .15s; min-width: 28px; text-align: center;
-  }
-  .note-toolbar button:hover { border-color: var(--accent); color: var(--accent); }
-  .note-body {
-    flex: 1; background: transparent; border: none; outline: none;
-    font-size: 14px; color: var(--txt); resize: none;
-    font-family: 'JetBrains Mono', monospace; line-height: 1.7;
-    min-height: 400px;
-  }
-  .note-body::placeholder { color: var(--txt3); }
-  .note-preview { font-size: 14px; line-height: 1.7; color: var(--txt); flex: 1; }
-  .note-preview h1,.note-preview h2,.note-preview h3 { color: var(--txt); margin: 16px 0 8px; }
-  .note-preview p { margin-bottom: 10px; }
-  .note-preview code { background: var(--surface); padding: 1px 6px; border-radius: 4px; font-family: monospace; color: var(--accent); }
-  .note-preview pre { background: var(--surface); padding: 12px; border-radius: 6px; overflow-x: auto; }
-  .note-preview ul,.note-preview ol { padding-left: 20px; margin-bottom: 10px; }
-  .note-preview blockquote { border-left: 3px solid var(--accent); padding-left: 12px; color: var(--txt2); margin: 10px 0; }
-  .note-preview a { color: var(--accent); }
-
-  /* ── MODAL ──────────────────────────────────────────── */
-  .modal-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,.7);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 500; padding: 20px;
-  }
-  .modal-overlay.hidden { display: none; }
-  .modal {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 14px; padding: 28px; max-width: 480px; width: 100%;
-    box-shadow: 0 24px 80px rgba(0,0,0,.6);
-  }
-  .modal h2 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
-  .modal p { color: var(--txt2); font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
-  .form-group { margin-bottom: 14px; }
-  .form-label { font-size: 12px; color: var(--txt2); font-weight: 500; margin-bottom: 5px; display: block; }
-  .form-input {
-    width: 100%; background: var(--surface); border: 1px solid var(--border);
-    border-radius: 7px; padding: 9px 12px; color: var(--txt); font-size: 13px;
-    outline: none; font-family: 'JetBrains Mono', monospace; transition: border-color .2s;
-  }
-  .form-input:focus { border-color: var(--accent); }
-  .form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
-
-  /* ── TOAST ──────────────────────────────────────────── */
-  .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; }
-  .toast {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 9px; padding: 12px 16px; font-size: 13px;
-    box-shadow: var(--shadow); display: flex; align-items: center; gap: 10px;
-    animation: slideIn .3s ease; max-width: 320px;
-  }
-  .toast.success { border-color: var(--green); }
-  .toast.error { border-color: var(--red); }
-  .toast.info { border-color: var(--accent); }
-  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-
-  /* ── BADGE ──────────────────────────────────────────── */
-  .badge {
-    display: inline-flex; align-items: center; justify-content: center;
-    min-width: 18px; height: 18px; border-radius: 9px;
-    background: var(--accent); color: #fff; font-size: 10px; font-weight: 700;
-    padding: 0 5px;
-  }
-
-  /* ── SECTION HEADER ─────────────────────────────────── */
-  .section-header {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 16px;
-  }
-  .section-title { font-size: 16px; font-weight: 700; }
-  .section-sub { font-size: 12px; color: var(--txt3); margin-top: 2px; }
-
-  /* ── WEEK SCHEDULE ──────────────────────────────────── */
-  .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
-  .day-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 8px; padding: 12px; text-align: center;
-  }
-  .day-name { font-size: 10px; color: var(--txt3); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
-  .day-date { font-size: 15px; font-weight: 700; margin: 4px 0; }
-  .day-hours { font-size: 11px; color: var(--accent); font-weight: 600; }
-  .day-card.today { border-color: var(--accent); background: rgba(14,165,233,.05); }
-  .day-card.weekend .day-hours { color: var(--purple); }
-  .day-card.done { border-color: var(--green); }
-  .day-card.done .day-date { color: var(--green); }
-  .day-status { width: 6px; height: 6px; border-radius: 50%; background: var(--border); margin: 6px auto 0; }
-  .day-status.done { background: var(--green); }
-
-  /* ── EMPTY STATE ────────────────────────────────────── */
-  .empty-state { text-align: center; padding: 40px; color: var(--txt3); }
-  .empty-state .empty-icon { font-size: 36px; margin-bottom: 12px; }
-  .empty-state p { font-size: 13px; }
-
-  /* ── SETUP PANEL ────────────────────────────────────── */
-  .setup-card {
-    max-width: 560px; margin: 60px auto;
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 16px; padding: 36px;
-  }
-  .setup-logo { text-align: center; margin-bottom: 28px; }
-  .setup-steps { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
-  .setup-step {
-    display: flex; align-items: flex-start; gap: 12px;
-    background: var(--surface); border-radius: 8px; padding: 12px;
-  }
-  .step-num {
-    width: 24px; height: 24px; border-radius: 50%;
-    background: rgba(14,165,233,.2); color: var(--accent);
-    font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
-    min-width: 24px;
-  }
-  .step-text { font-size: 12px; color: var(--txt2); line-height: 1.5; }
-  .step-text strong { color: var(--txt); }
-  .demo-btn {
-    display: block; width: 100%; text-align: center;
-    padding: 10px; background: rgba(14,165,233,.1);
-    color: var(--accent); border-radius: 7px; cursor: pointer;
-    font-size: 13px; font-weight: 500; border: 1px solid rgba(14,165,233,.3);
-    margin-top: 12px; transition: all .2s;
-  }
-  .demo-btn:hover { background: rgba(14,165,233,.2); }
-
-  /* ── SELECT ─────────────────────────────────────────── */
-  select.form-input { cursor: pointer; }
-
-  /* ── INLINE FORM ─────────────────────────────────────── */
-  .add-resource-form, .add-note-form {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 10px; padding: 16px; margin-bottom: 16px;
-    display: none;
-  }
-  .add-resource-form.show, .add-note-form.show { display: block; }
-  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-
-  /* ── RESPONSIVE ─────────────────────────────────────── */
-  @media (max-width: 768px) {
-    .main { padding: 12px; }
-    .grid-4 { grid-template-columns: 1fr 1fr; }
-    .grid-3 { grid-template-columns: 1fr; }
-    .grid-2 { grid-template-columns: 1fr; }
-    .gantt-label-col, .gantt-task-name { width: 120px; min-width: 120px; }
-    .notes-layout { grid-template-columns: 1fr; }
-    .notes-sidebar { display: none; }
-    .notes-sidebar.mobile-open { display: flex; position: fixed; inset: 0; z-index: 200; border-radius: 0; }
-    .week-grid { grid-template-columns: repeat(4, 1fr); }
-    .form-row { grid-template-columns: 1fr; }
-    .nav-tab { padding: 10px 12px; font-size: 12px; gap: 5px; }
-    .nav-tab .tab-label { display: none; }
-    .nav-tab .tab-icon { font-size: 18px; }
-    .nav-tab.active .tab-label { display: inline; }
-    .header { height: 50px; }
-    .header-sub { display: none; }
-    .stat-value { font-size: 22px; }
-    .topics-grid { grid-template-columns: 1fr; }
-    .resources-grid { grid-template-columns: 1fr; }
-    .section-header { flex-direction: column; align-items: flex-start; gap: 8px; }
-  }
-  @media (max-width: 480px) {
-    .week-grid { grid-template-columns: repeat(2, 1fr); }
-  }
-
-  /* ── TIMELINE INDICATOR ─────────────────────────────── */
-  .timeline-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
-  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--txt2); }
-  .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
-
-  /* ── DIVIDER ─────────────────────────────────────────── */
-  .divider { height: 1px; background: var(--border); margin: 16px 0; }
-
-  /* ── CIRCULAR PROGRESS ──────────────────────────────── */
-  .ring-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; }
-  .ring-label { position: absolute; text-align: center; }
-  .ring-pct { font-size: 22px; font-weight: 700; display: block; }
-  .ring-sub { font-size: 10px; color: var(--txt3); display: block; }
-
-  /* ── STREAK ─────────────────────────────────────────── */
-  .streak-display { display: flex; align-items: center; gap: 8px; }
-  .streak-fire { font-size: 28px; }
-  .streak-num { font-size: 32px; font-weight: 800; color: var(--amber); line-height: 1; }
-  .streak-label { font-size: 12px; color: var(--txt2); }
+:root{--bg:#0a0e1a;--surface:#111827;--card:#1a2234;--border:#1e2d47;--accent:#0ea5e9;--accent2:#06b6d4;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--purple:#a855f7;--txt:#e2e8f0;--txt2:#94a3b8;--txt3:#64748b;--radius:10px;--shadow:0 4px 24px rgba(0,0,0,.4);--font:'Inter',system-ui,sans-serif}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg);color:var(--txt);min-height:100vh;font-size:14px}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:var(--surface)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.app{display:flex;flex-direction:column;min-height:100vh}
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;gap:16px;height:56px;position:sticky;top:0;z-index:100}
+.header-logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;letter-spacing:-.3px;white-space:nowrap}
+.logo-badge{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:10px;font-weight:700;padding:3px 7px;border-radius:5px;letter-spacing:.5px}
+.header-sub{color:var(--txt3);font-size:12px}
+.header-spacer{flex:1}
+.sync-indicator{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--txt3);cursor:pointer;padding:5px 10px;border-radius:6px;border:1px solid var(--border);transition:all .2s}
+.sync-indicator:hover{border-color:var(--accent);color:var(--accent)}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--txt3)}
+.sync-dot.ok{background:var(--green);animation:pulse 2s infinite}
+.sync-dot.err{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.nav{background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto;scrollbar-width:none;padding:0 12px}
+.nav::-webkit-scrollbar{display:none}
+.nav-tab{padding:12px 18px;color:var(--txt3);cursor:pointer;font-size:13px;font-weight:500;white-space:nowrap;border-bottom:2px solid transparent;transition:all .2s;display:flex;align-items:center;gap:7px;user-select:none}
+.nav-tab:hover{color:var(--txt)}
+.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.main{flex:1;padding:20px;max-width:1400px;margin:0 auto;width:100%}
+.panel{display:none}.panel.active{display:block}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow)}
+.card-title{font-size:13px;font-weight:600;color:var(--txt2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.card-title span{color:var(--accent)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.stat-tile{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden}
+.stat-tile::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--accent-color,var(--accent))}
+.stat-label{font-size:11px;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px}
+.stat-value{font-size:28px;font-weight:700;color:var(--txt);line-height:1}
+.stat-sub{font-size:12px;color:var(--txt2)}
+.progress-bar{height:6px;background:var(--border);border-radius:99px;overflow:hidden;margin-top:8px}
+.progress-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .6s ease}
+.progress-label{display:flex;justify-content:space-between;font-size:11px;color:var(--txt3);margin-bottom:4px}
+.gantt-wrapper{overflow-x:auto;border-radius:var(--radius)}
+.gantt-header{display:flex;margin-bottom:8px}
+.gantt-label-col{width:180px;min-width:180px;font-size:11px;color:var(--txt3);font-weight:600}
+.gantt-row{display:flex;align-items:center;margin-bottom:6px}
+.gantt-task-name{width:180px;min-width:180px;font-size:12px;color:var(--txt2);padding-right:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gantt-track{flex:1;height:24px;background:var(--border);border-radius:4px;position:relative;overflow:visible}
+.gantt-bar{position:absolute;height:100%;border-radius:4px;display:flex;align-items:center;font-size:10px;font-weight:600;color:rgba(255,255,255,.9);white-space:nowrap;overflow:hidden}
+.gantt-today{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--amber);z-index:2;opacity:.8}
+.topics-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;padding:8px 0 16px 0}
+.topic-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;cursor:pointer;transition:border-color .2s,transform .15s;position:relative}
+.topic-card:hover{border-color:var(--accent);transform:translateY(-1px)}
+.topic-card.done{border-color:var(--green)}.topic-card.inprogress{border-color:var(--amber)}
+.topic-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px}
+.topic-status{width:10px;height:10px;border-radius:50%;min-width:10px;background:var(--border);margin-top:3px}
+.topic-card.done .topic-status{background:var(--green)}.topic-card.inprogress .topic-status{background:var(--amber)}
+.topic-name{font-size:13px;font-weight:500;color:var(--txt);flex:1}
+.topic-meta{display:flex;gap:8px;flex-wrap:wrap}
+.topic-hrs{font-size:11px;color:var(--txt3);margin-left:auto}
+.tag{font-size:10px;padding:2px 7px;border-radius:4px;background:var(--border);color:var(--txt2);font-weight:500}
+.tag.p1{background:rgba(14,165,233,.15);color:var(--accent)}.tag.p2{background:rgba(168,85,247,.15);color:var(--purple)}
+.tag.p3{background:rgba(34,197,94,.15);color:var(--green)}.tag.p4{background:rgba(245,158,11,.15);color:var(--amber)}
+.tag.p5{background:rgba(239,68,68,.15);color:var(--red)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .2s}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#0284c7}
+.btn-ghost{background:transparent;color:var(--txt2);border:1px solid var(--border)}.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-success{background:rgba(34,197,94,.15);color:var(--green);border:1px solid var(--green)}
+.btn-sm{padding:4px 10px;font-size:11px}
+.filter-btn{padding:5px 12px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--txt2);transition:all .2s}
+.filter-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(14,165,233,.1)}
+.resource-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.resources-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.resource-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:8px;transition:border-color .2s}
+.resource-item:hover{border-color:var(--accent)}
+.resource-title{font-size:13px;font-weight:600;color:var(--txt)}
+.resource-link{font-size:11px;color:var(--accent);text-decoration:none;font-weight:500}
+.resource-link:hover{text-decoration:underline}
+.notes-layout{display:grid;grid-template-columns:260px 1fr;gap:16px;min-height:600px}
+.notes-sidebar{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;gap:8px}
+.notes-list{display:flex;flex-direction:column;gap:4px;overflow-y:auto;flex:1}
+.note-item{padding:10px 12px;border-radius:7px;cursor:pointer;transition:background .15s;border:1px solid transparent}
+.note-item:hover{background:var(--surface)}.note-item.active{background:rgba(14,165,233,.1);border-color:rgba(14,165,233,.3)}
+.note-item-title{font-size:13px;font-weight:500;color:var(--txt);margin-bottom:2px}
+.note-item-date{font-size:11px;color:var(--txt3)}
+.notes-editor{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;display:flex;flex-direction:column;gap:14px}
+.note-title-input{background:transparent;border:none;outline:none;font-size:20px;font-weight:700;color:var(--txt);width:100%;font-family:var(--font)}
+.note-title-input::placeholder{color:var(--txt3)}
+.note-toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.note-toolbar button{padding:4px 8px;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--txt2);transition:all .15s;min-width:28px;text-align:center}
+.note-toolbar button:hover{border-color:var(--accent);color:var(--accent)}
+.note-body{flex:1;background:transparent;border:none;outline:none;font-size:14px;color:var(--txt);resize:none;font-family:monospace;line-height:1.7;min-height:400px}
+.note-body::placeholder{color:var(--txt3)}
+.note-preview{font-size:14px;line-height:1.7;color:var(--txt);flex:1;min-height:400px}
+.note-preview h1,.note-preview h2,.note-preview h3{color:var(--txt);margin:16px 0 8px}
+.note-preview p{margin-bottom:10px}.note-preview code{background:var(--surface);padding:1px 6px;border-radius:4px;font-family:monospace;color:var(--accent)}
+.note-preview pre{background:var(--surface);padding:12px;border-radius:6px;overflow-x:auto}
+.note-preview ul,.note-preview ol{padding-left:20px;margin-bottom:10px}
+.note-preview blockquote{border-left:3px solid var(--accent);padding-left:12px;color:var(--txt2);margin:10px 0}
+.note-preview a{color:var(--accent)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px}
+.modal-overlay.hidden{display:none}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:28px;max-width:500px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+.modal h2{font-size:18px;font-weight:700;margin-bottom:6px}
+.modal p{color:var(--txt2);font-size:13px;margin-bottom:20px;line-height:1.5}
+.form-group{margin-bottom:14px}
+.form-label{font-size:12px;color:var(--txt2);font-weight:500;margin-bottom:5px;display:block}
+.form-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--txt);font-size:13px;outline:none;font-family:monospace;transition:border-color .2s}
+.form-input:focus{border-color:var(--accent)}
+select.form-input{cursor:pointer;font-family:var(--font)}
+.form-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+.toast-container{position:fixed;bottom:20px;right:20px;z-index:1000;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:12px 16px;font-size:13px;box-shadow:var(--shadow);display:flex;align-items:center;gap:10px;animation:slideIn .3s ease;max-width:320px}
+.toast.success{border-color:var(--green)}.toast.error{border-color:var(--red)}.toast.info{border-color:var(--accent)}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.section-title{font-size:16px;font-weight:700}
+.section-sub{font-size:12px;color:var(--txt3);margin-top:2px}
+.week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.day-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center}
+.day-name{font-size:10px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.day-date{font-size:15px;font-weight:700;margin:4px 0}
+.day-hours{font-size:11px;color:var(--accent);font-weight:600}
+.day-card.today{border-color:var(--accent);background:rgba(14,165,233,.05)}
+.day-card.weekend .day-hours{color:var(--purple)}
+.day-card.checked{border-color:var(--green)}.day-card.checked .day-date{color:var(--green)}
+.day-dot{width:6px;height:6px;border-radius:50%;background:var(--border);margin:6px auto 0}
+.day-dot.checked{background:var(--green)}
+.setup-step{display:flex;align-items:flex-start;gap:12px;background:var(--surface);border-radius:8px;padding:12px;margin-bottom:8px}
+.step-num{width:24px;height:24px;border-radius:50%;background:rgba(14,165,233,.2);color:var(--accent);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;min-width:24px}
+.step-text{font-size:12px;color:var(--txt2);line-height:1.5}.step-text strong{color:var(--txt)}
+.add-form{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;display:none}
+.add-form.show{display:block}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.divider{height:1px;background:var(--border);margin:16px 0}
+.empty-state{text-align:center;padding:40px;color:var(--txt3)}
+.empty-state .ei{font-size:36px;margin-bottom:12px}
+.streak-display{display:flex;align-items:center;gap:8px}
+.streak-num{font-size:32px;font-weight:800;color:var(--amber);line-height:1}
+.timeline-legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--txt2)}
+.legend-dot{width:10px;height:10px;border-radius:2px}
+.phase-header{display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer;user-select:none}
+.phase-title{font-size:14px;font-weight:600}
+.phase-badge{font-size:10px;padding:2px 8px;border-radius:99px;background:var(--border);color:var(--txt2);font-weight:600}
+.phase-prog{flex:1;height:4px;background:var(--border);border-radius:99px;overflow:hidden}
+.phase-chev{color:var(--txt3);transition:transform .3s;font-size:12px}.phase-chev.open{transform:rotate(90deg)}
+@media(max-width:768px){
+  .main{padding:12px}.grid-4{grid-template-columns:1fr 1fr}.grid-3{grid-template-columns:1fr}.grid-2{grid-template-columns:1fr}
+  .gantt-label-col,.gantt-task-name{width:110px;min-width:110px}.notes-layout{grid-template-columns:1fr}
+  .notes-sidebar{display:none}.week-grid{grid-template-columns:repeat(4,1fr)}.form-row{grid-template-columns:1fr}
+  .nav-tab{padding:10px 12px;font-size:12px;gap:5px}.tab-lbl{display:none}
+  .nav-tab.active .tab-lbl{display:inline}.stat-value{font-size:22px}
+  .topics-grid{grid-template-columns:1fr}.resources-grid{grid-template-columns:1fr}
+  .section-header{flex-direction:column;align-items:flex-start;gap:8px}
+}
+@media(max-width:480px){.week-grid{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
+<div class="app">
 
-<div class="app" id="app">
+<header class="header">
+  <div class="header-logo"><div class="logo-badge">SAP</div><span>AI Expert Path</span></div>
+  <span class="header-sub" id="hDate"></span>
+  <div class="header-spacer"></div>
+  <div class="sync-indicator" onclick="openSettings()">
+    <div class="sync-dot" id="syncDot"></div>
+    <span id="syncLbl">Configure DB</span>
+  </div>
+</header>
 
-  <!-- HEADER -->
-  <header class="header">
-    <div class="header-logo">
-      <div class="logo-badge">SAP</div>
-      <span>AI Expert Path</span>
-    </div>
-    <span class="header-sub" id="headerDate"></span>
-    <div class="header-spacer"></div>
-    <div class="sync-indicator" onclick="openSettings()" title="Supabase sync">
-      <div class="sync-dot" id="syncDot"></div>
-      <span id="syncLabel">Configure DB</span>
-    </div>
-  </header>
+<nav class="nav">
+  <div class="nav-tab active" onclick="goTab('dashboard')" data-tab="dashboard"><span>📊</span><span class="tab-lbl">Dashboard</span></div>
+  <div class="nav-tab" onclick="goTab('topics')" data-tab="topics"><span>📚</span><span class="tab-lbl">Topics</span></div>
+  <div class="nav-tab" onclick="goTab('gantt')" data-tab="gantt"><span>📅</span><span class="tab-lbl">Gantt</span></div>
+  <div class="nav-tab" onclick="goTab('resources')" data-tab="resources"><span>🔗</span><span class="tab-lbl">Resources</span></div>
+  <div class="nav-tab" onclick="goTab('notes')" data-tab="notes"><span>📝</span><span class="tab-lbl">Notes</span></div>
+  <div class="nav-tab" onclick="goTab('schedule')" data-tab="schedule"><span>🗓️</span><span class="tab-lbl">Schedule</span></div>
+</nav>
 
-  <!-- NAV TABS -->
-  <nav class="nav" id="mainNav">
-    <div class="nav-tab active" onclick="switchTab('dashboard')" data-tab="dashboard">
-      <span class="tab-icon">📊</span><span class="tab-label">Dashboard</span>
-    </div>
-    <div class="nav-tab" onclick="switchTab('topics')" data-tab="topics">
-      <span class="tab-icon">📚</span><span class="tab-label">Topics</span>
-    </div>
-    <div class="nav-tab" onclick="switchTab('gantt')" data-tab="gantt">
-      <span class="tab-icon">📅</span><span class="tab-label">Gantt</span>
-    </div>
-    <div class="nav-tab" onclick="switchTab('resources')" data-tab="resources">
-      <span class="tab-icon">🔗</span><span class="tab-label">Resources</span>
-    </div>
-    <div class="nav-tab" onclick="switchTab('notes')" data-tab="notes">
-      <span class="tab-icon">📝</span><span class="tab-label">Notes</span>
-    </div>
-    <div class="nav-tab" onclick="switchTab('schedule')" data-tab="schedule">
-      <span class="tab-icon">🗓️</span><span class="tab-label">Schedule</span>
-    </div>
-  </nav>
+<main class="main">
 
-  <!-- MAIN CONTENT -->
-  <main class="main">
+<!-- DASHBOARD -->
+<div class="panel active" id="panel-dashboard">
+  <div class="section-header">
+    <div><div class="section-title">Overview</div><div class="section-sub">Your SAP AI Expert journey at a glance</div></div>
+    <button class="btn btn-ghost btn-sm" onclick="doCheckIn()">✅ Check In Today</button>
+  </div>
+  <div class="grid-4" style="margin-bottom:16px">
+    <div class="stat-tile" style="--accent-color:var(--accent)"><div class="stat-label">Overall Progress</div><div class="stat-value" id="sPct">0%</div><div class="stat-sub" id="sSub">0 of 45 done</div><div class="progress-bar"><div class="progress-fill" id="sFill" style="width:0%"></div></div></div>
+    <div class="stat-tile" style="--accent-color:var(--green)"><div class="stat-label">Study Streak</div><div class="streak-display"><span style="font-size:28px">🔥</span><div><div class="streak-num" id="sStreak">0</div><div style="font-size:12px;color:var(--txt2)">days</div></div></div></div>
+    <div class="stat-tile" style="--accent-color:var(--purple)"><div class="stat-label">Hours Logged</div><div class="stat-value" id="sHrs">0h</div><div class="stat-sub">Target: 120h total</div></div>
+    <div class="stat-tile" style="--accent-color:var(--amber)"><div class="stat-label">Days Remaining</div><div class="stat-value" id="sDays">—</div><div class="stat-sub" id="sDaysSub">to target completion</div></div>
+  </div>
+  <div class="card" style="margin-bottom:16px"><div class="card-title"><span>◈</span> Phase Progress</div><div id="phaseProg"></div></div>
+  <div class="grid-2">
+    <div class="card"><div class="card-title"><span>◈</span> This Week</div><div id="weekCard"></div></div>
+    <div class="card"><div class="card-title"><span>◈</span> Current Focus</div><div id="focusCard"></div></div>
+  </div>
+</div>
 
-    <!-- ════ DASHBOARD ════ -->
-    <div class="panel active" id="panel-dashboard">
-      <div class="section-header">
-        <div>
-          <div class="section-title">Overview</div>
-          <div class="section-sub" id="dashboardSub">Your SAP AI Expert journey at a glance</div>
-        </div>
-        <button class="btn btn-ghost btn-sm" onclick="checkIn()">✅ Check In Today</button>
-      </div>
-
-      <!-- STAT TILES -->
-      <div class="grid-4" style="margin-bottom:16px" id="statTiles">
-        <div class="stat-tile" style="--accent-color:var(--accent)">
-          <div class="stat-label">Overall Progress</div>
-          <div class="stat-value" id="statProgress">0%</div>
-          <div class="stat-sub" id="statProgressSub">0 of 45 topics done</div>
-          <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
-        </div>
-        <div class="stat-tile" style="--accent-color:var(--green)">
-          <div class="stat-label">Study Streak</div>
-          <div class="streak-display">
-            <div class="streak-fire">🔥</div>
-            <div>
-              <div class="streak-num" id="statStreak">0</div>
-              <div class="streak-label">days</div>
-            </div>
-          </div>
-        </div>
-        <div class="stat-tile" style="--accent-color:var(--purple)">
-          <div class="stat-label">Hours Logged</div>
-          <div class="stat-value" id="statHours">0h</div>
-          <div class="stat-sub" id="statHoursSub">Target: 120h total</div>
-        </div>
-        <div class="stat-tile" style="--accent-color:var(--amber)">
-          <div class="stat-label">Days Remaining</div>
-          <div class="stat-value" id="statDays">—</div>
-          <div class="stat-sub" id="statDaysSub">to target completion</div>
-        </div>
-      </div>
-
-      <!-- PHASE PROGRESS -->
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-title"><span>◈</span> Phase Progress</div>
-        <div id="phaseProgress"></div>
-      </div>
-
-      <!-- CURRENT WEEK + RECENT ACTIVITY -->
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-title"><span>◈</span> This Week</div>
-          <div id="thisWeekCard"></div>
-        </div>
-        <div class="card">
-          <div class="card-title"><span>◈</span> Current Focus</div>
-          <div id="currentFocusCard"></div>
-        </div>
-      </div>
+<!-- TOPICS -->
+<div class="panel" id="panel-topics">
+  <div class="section-header">
+    <div><div class="section-title">Learning Topics</div><div class="section-sub">Click any topic to update status</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <select class="form-input" style="width:130px;padding:6px 10px" id="fPhase" onchange="renderTopics()">
+        <option value="">All Phases</option>
+        <option value="1">Phase 1</option><option value="2">Phase 2</option><option value="3">Phase 3</option><option value="4">Phase 4</option><option value="5">Phase 5</option>
+      </select>
+      <select class="form-input" style="width:130px;padding:6px 10px" id="fStatus" onchange="renderTopics()">
+        <option value="">All Status</option>
+        <option value="todo">To Do</option><option value="inprogress">In Progress</option><option value="done">Done</option>
+      </select>
     </div>
+  </div>
+  <div id="topicsWrap"></div>
+</div>
 
-    <!-- ════ TOPICS ════ -->
-    <div class="panel" id="panel-topics">
-      <div class="section-header">
-        <div>
-          <div class="section-title">Learning Topics</div>
-          <div class="section-sub">Click a topic to update status — all changes sync across devices</div>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <select class="form-input" style="width:140px;padding:6px 10px" id="topicFilterPhase" onchange="renderTopics()">
-            <option value="">All Phases</option>
-            <option value="1">Phase 1</option>
-            <option value="2">Phase 2</option>
-            <option value="3">Phase 3</option>
-            <option value="4">Phase 4</option>
-            <option value="5">Phase 5</option>
+<!-- GANTT -->
+<div class="panel" id="panel-gantt">
+  <div class="section-header"><div><div class="section-title">Learning Roadmap — Gantt View</div><div class="section-sub">24-week journey | Weekdays 1.5h · Weekends 2h/day</div></div></div>
+  <div class="card"><div class="timeline-legend" id="ganttLegend"></div><div class="gantt-wrapper" id="ganttChart"></div></div>
+  <div class="card" style="margin-top:16px"><div class="card-title"><span>◈</span> Milestones</div><div id="mStones"></div></div>
+</div>
+
+<!-- RESOURCES -->
+<div class="panel" id="panel-resources">
+  <div class="section-header">
+    <div><div class="section-title">Resources</div><div class="section-sub">Links, PDFs, courses — synced across devices</div></div>
+    <button class="btn btn-primary btn-sm" onclick="toggleForm('addResForm')">+ Add Resource</button>
+  </div>
+  <div class="add-form" id="addResForm">
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Title *</label><input class="form-input" id="rTitle" placeholder="SAP Documentation"></div>
+      <div class="form-group"><label class="form-label">Type</label><select class="form-input" id="rType"><option value="link">🔗 Link</option><option value="pdf">📄 PDF</option><option value="video">🎬 Video</option><option value="course">🎓 Course</option><option value="book">📖 Book</option><option value="tool">🛠️ Tool</option></select></div>
+    </div>
+    <div class="form-group"><label class="form-label">URL</label><input class="form-input" id="rUrl" placeholder="https://..."></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Phase</label><select class="form-input" id="rPhase"><option value="">General</option><option value="1">Phase 1</option><option value="2">Phase 2</option><option value="3">Phase 3</option><option value="4">Phase 4</option><option value="5">Phase 5</option></select></div>
+      <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="rDesc" placeholder="Brief description"></div>
+    </div>
+    <div style="display:flex;gap:8px"><button class="btn btn-primary btn-sm" onclick="saveResource()">Save</button><button class="btn btn-ghost btn-sm" onclick="toggleForm('addResForm')">Cancel</button></div>
+  </div>
+  <div class="resource-filters" id="resFilt">
+    <button class="filter-btn active" data-f="" onclick="filterRes(this,'')">All</button>
+    <button class="filter-btn" data-f="link" onclick="filterRes(this,'link')">🔗 Links</button>
+    <button class="filter-btn" data-f="pdf" onclick="filterRes(this,'pdf')">📄 PDFs</button>
+    <button class="filter-btn" data-f="video" onclick="filterRes(this,'video')">🎬 Videos</button>
+    <button class="filter-btn" data-f="course" onclick="filterRes(this,'course')">🎓 Courses</button>
+    <button class="filter-btn" data-f="book" onclick="filterRes(this,'book')">📖 Books</button>
+    <button class="filter-btn" data-f="tool" onclick="filterRes(this,'tool')">🛠️ Tools</button>
+  </div>
+  <div class="resources-grid" id="resGrid"></div>
+</div>
+
+<!-- NOTES -->
+<div class="panel" id="panel-notes">
+  <div class="notes-layout">
+    <div class="notes-sidebar">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><div style="font-weight:600;font-size:13px">My Notes</div><button class="btn btn-primary btn-sm" onclick="newNote()">+ New</button></div>
+      <input class="form-input" placeholder="Search notes..." id="noteSearch" oninput="renderNotes()">
+      <div class="notes-list" id="notesList"></div>
+    </div>
+    <div class="notes-editor">
+      <div id="noteEmpty" class="empty-state"><div class="ei">📝</div><p>Select a note or create a new one</p></div>
+      <div id="noteContent" style="display:none;flex-direction:column;gap:12px;flex:1">
+        <div style="display:flex;align-items:center;gap:10px">
+          <input class="note-title-input" id="nTitle" placeholder="Note title..." oninput="debounceSave()">
+          <select class="form-input" style="width:110px;padding:5px 8px" id="nTag" onchange="debounceSave()">
+            <option value="">No tag</option><option value="Phase 1">Phase 1</option><option value="Phase 2">Phase 2</option><option value="Phase 3">Phase 3</option><option value="Phase 4">Phase 4</option><option value="Phase 5">Phase 5</option><option value="General">General</option>
           </select>
-          <select class="form-input" style="width:140px;padding:6px 10px" id="topicFilterStatus" onchange="renderTopics()">
-            <option value="">All Status</option>
-            <option value="todo">To Do</option>
-            <option value="inprogress">In Progress</option>
-            <option value="done">Done</option>
-          </select>
-        </div>
-      </div>
-      <div id="topicsContainer"></div>
-    </div>
-
-    <!-- ════ GANTT ════ -->
-    <div class="panel" id="panel-gantt">
-      <div class="section-header">
-        <div>
-          <div class="section-title">Learning Roadmap — Gantt View</div>
-          <div class="section-sub">6-month journey to SAP AI Expert | Weekdays 1.5h, Weekends 2h/day</div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="timeline-legend" id="ganttLegend"></div>
-        <div class="gantt-wrapper" id="ganttChart"></div>
-      </div>
-      <div class="card" style="margin-top:16px">
-        <div class="card-title"><span>◈</span> Milestone Tracker</div>
-        <div id="milestones"></div>
-      </div>
-    </div>
-
-    <!-- ════ RESOURCES ════ -->
-    <div class="panel" id="panel-resources">
-      <div class="section-header">
-        <div>
-          <div class="section-title">Resources</div>
-          <div class="section-sub">Links, PDFs, courses, and references — synced across all devices</div>
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="toggleAddResource()">+ Add Resource</button>
-      </div>
-
-      <div class="add-resource-form" id="addResourceForm">
-        <div class="form-row">
-          <div class="form-group"><label class="form-label">Title *</label><input class="form-input" id="resTitle" placeholder="SAP BTP Documentation"></div>
-          <div class="form-group"><label class="form-label">Type</label>
-            <select class="form-input" id="resType">
-              <option value="link">🔗 Link</option>
-              <option value="pdf">📄 PDF</option>
-              <option value="video">🎬 Video</option>
-              <option value="course">🎓 Course</option>
-              <option value="book">📖 Book</option>
-              <option value="tool">🛠️ Tool</option>
-            </select>
+          <div style="display:flex;gap:6px;margin-left:auto">
+            <button class="btn btn-ghost btn-sm" onclick="togglePreview()" id="prevBtn">👁 Preview</button>
+            <button class="btn btn-ghost btn-sm" onclick="delNote()">🗑</button>
           </div>
         </div>
-        <div class="form-group"><label class="form-label">URL</label><input class="form-input" id="resUrl" placeholder="https://..."></div>
-        <div class="form-row">
-          <div class="form-group"><label class="form-label">Phase</label>
-            <select class="form-input" id="resPhase">
-              <option value="">General</option>
-              <option value="1">Phase 1</option>
-              <option value="2">Phase 2</option>
-              <option value="3">Phase 3</option>
-              <option value="4">Phase 4</option>
-              <option value="5">Phase 5</option>
-            </select>
-          </div>
-          <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="resDesc" placeholder="Brief description"></div>
+        <div class="note-toolbar">
+          <button onclick="ins('**','**')"><b>B</b></button><button onclick="ins('*','*')"><i>I</i></button>
+          <button onclick="ins('\`','\`')">Code</button><button onclick="ins('\`\`\`\n','\n\`\`\`')">Block</button>
+          <button onclick="ins('# ','')">H1</button><button onclick="ins('## ','')">H2</button><button onclick="ins('### ','')">H3</button>
+          <button onclick="ins('- ','')">List</button><button onclick="ins('> ','')">Quote</button><button onclick="ins('[','](url)')">Link</button>
         </div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-primary btn-sm" onclick="saveResource()">Save Resource</button>
-          <button class="btn btn-ghost btn-sm" onclick="toggleAddResource()">Cancel</button>
-        </div>
-      </div>
-
-      <div class="resource-filters" id="resourceFilters">
-        <button class="filter-btn active" onclick="filterResources('')" data-filter="">All</button>
-        <button class="filter-btn" onclick="filterResources('link')" data-filter="link">🔗 Links</button>
-        <button class="filter-btn" onclick="filterResources('pdf')" data-filter="pdf">📄 PDFs</button>
-        <button class="filter-btn" onclick="filterResources('video')" data-filter="video">🎬 Videos</button>
-        <button class="filter-btn" onclick="filterResources('course')" data-filter="course">🎓 Courses</button>
-        <button class="filter-btn" onclick="filterResources('book')" data-filter="book">📖 Books</button>
-        <button class="filter-btn" onclick="filterResources('tool')" data-filter="tool">🛠️ Tools</button>
-      </div>
-      <div class="resources-grid" id="resourcesGrid"></div>
-    </div>
-
-    <!-- ════ NOTES ════ -->
-    <div class="panel" id="panel-notes">
-      <div class="notes-layout">
-        <!-- Sidebar -->
-        <div class="notes-sidebar" id="notesSidebar">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-            <div style="font-weight:600;font-size:13px">My Notes</div>
-            <button class="btn btn-primary btn-sm" onclick="newNote()">+ New</button>
-          </div>
-          <input class="form-input" style="margin-bottom:6px" placeholder="Search notes..." id="noteSearch" oninput="renderNotesList()">
-          <div class="notes-list" id="notesList"></div>
-        </div>
-        <!-- Editor -->
-        <div class="notes-editor" id="notesEditor">
-          <div id="noteEditorEmpty" class="empty-state">
-            <div class="empty-icon">📝</div>
-            <p>Select a note or create a new one</p>
-          </div>
-          <div id="noteEditorContent" style="display:none;display:flex;flex-direction:column;gap:12px;flex:1">
-            <div style="display:flex;align-items:center;gap:10px">
-              <input class="note-title-input" id="noteTitleInput" placeholder="Note title..." oninput="debounceSave()">
-              <select class="form-input" style="width:120px;padding:5px 8px" id="notePhaseTag" onchange="debounceSave()">
-                <option value="">No tag</option>
-                <option value="phase1">Phase 1</option>
-                <option value="phase2">Phase 2</option>
-                <option value="phase3">Phase 3</option>
-                <option value="phase4">Phase 4</option>
-                <option value="phase5">Phase 5</option>
-                <option value="general">General</option>
-              </select>
-              <div style="display:flex;gap:6px;margin-left:auto">
-                <button class="btn btn-ghost btn-sm" onclick="togglePreview()" id="previewBtn">👁 Preview</button>
-                <button class="btn btn-ghost btn-sm" onclick="deleteNote()">🗑</button>
-              </div>
-            </div>
-            <div class="note-toolbar">
-              <button onclick="insertMd('**','**')"><b>B</b></button>
-              <button onclick="insertMd('*','*')"><i>I</i></button>
-              <button onclick="insertMd('`','`')">Code</button>
-              <button onclick="insertMd('```\n','\n```')">Block</button>
-              <button onclick="insertMd('# ','')">H1</button>
-              <button onclick="insertMd('## ','')">H2</button>
-              <button onclick="insertMd('### ','')">H3</button>
-              <button onclick="insertMd('- ','')">List</button>
-              <button onclick="insertMd('> ','')">Quote</button>
-              <button onclick="insertMd('[','](url)')">Link</button>
-              <button onclick="insertMd('\n---\n','')">HR</button>
-            </div>
-            <textarea class="note-body" id="noteBody" placeholder="Write your notes here... Markdown supported ✨" oninput="debounceSave()"></textarea>
-            <div class="note-preview" id="notePreview" style="display:none"></div>
-            <div style="display:flex;justify-content:space-between;align-items:center">
-              <span style="font-size:11px;color:var(--txt3)" id="noteSaveStatus">All changes saved</span>
-              <span style="font-size:11px;color:var(--txt3)" id="noteWordCount">0 words</span>
-            </div>
-          </div>
-        </div>
+        <textarea class="note-body" id="nBody" placeholder="Write notes here... Markdown supported ✨" oninput="debounceSave()"></textarea>
+        <div class="note-preview" id="nPreview" style="display:none"></div>
+        <div style="display:flex;justify-content:space-between"><span style="font-size:11px;color:var(--txt3)" id="nSaveStatus">All changes saved</span><span style="font-size:11px;color:var(--txt3)" id="nWords">0 words</span></div>
       </div>
     </div>
+  </div>
+</div>
 
-    <!-- ════ SCHEDULE ════ -->
-    <div class="panel" id="panel-schedule">
-      <div class="section-header">
-        <div>
-          <div class="section-title">Weekly Schedule</div>
-          <div class="section-sub">Weekdays: 1.5h/day · Weekends: 2h/day</div>
-        </div>
-        <button class="btn btn-ghost btn-sm" onclick="checkIn()">✅ Check In</button>
-      </div>
+<!-- SCHEDULE -->
+<div class="panel" id="panel-schedule">
+  <div class="section-header">
+    <div><div class="section-title">Weekly Schedule</div><div class="section-sub">Weekdays: 1.5h/day · Weekends: 2h/day</div></div>
+    <button class="btn btn-ghost btn-sm" onclick="doCheckIn()">✅ Check In</button>
+  </div>
+  <div class="card" style="margin-bottom:16px"><div class="card-title"><span>◈</span> This Week</div><div class="week-grid" id="weekGrid"></div></div>
+  <div class="grid-2">
+    <div class="card"><div class="card-title"><span>◈</span> Daily Plan</div><div id="dailyPlan"></div></div>
+    <div class="card"><div class="card-title"><span>◈</span> Study Tips</div><div id="studyTips"></div></div>
+  </div>
+</div>
 
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-title"><span>◈</span> This Week</div>
-        <div class="week-grid" id="weekGrid"></div>
-      </div>
-
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-title"><span>◈</span> Daily Study Plan</div>
-          <div id="dailyPlan"></div>
-        </div>
-        <div class="card">
-          <div class="card-title"><span>◈</span> Study Tips</div>
-          <div id="studyTips"></div>
-        </div>
-      </div>
-    </div>
-
-  </main>
+</main>
 </div>
 
 <!-- SETUP MODAL -->
 <div class="modal-overlay" id="setupModal">
   <div class="modal" style="max-width:540px">
-    <div class="setup-logo">
+    <div style="text-align:center;margin-bottom:24px">
       <div class="logo-badge" style="display:inline-block;font-size:13px;padding:6px 14px;margin-bottom:10px">SAP AI EXPERT</div>
       <div style="font-size:22px;font-weight:800">Connect Your Database</div>
-      <div style="font-size:13px;color:var(--txt2);margin-top:6px">Your data syncs instantly across all devices</div>
+      <div style="font-size:13px;color:var(--txt2);margin-top:6px">Data syncs instantly across all your devices</div>
     </div>
-    <div class="setup-steps">
-      <div class="setup-step">
-        <div class="step-num">1</div>
-        <div class="step-text">Go to <strong>supabase.com</strong> → Create a free account & new project</div>
-      </div>
-      <div class="setup-step">
-        <div class="step-num">2</div>
-        <div class="step-text">Open <strong>SQL Editor</strong> and run the schema below (copy from the box)</div>
-      </div>
-      <div class="setup-step">
-        <div class="step-num">3</div>
-        <div class="step-text">Go to <strong>Settings → API</strong> and copy your Project URL & anon key</div>
-      </div>
-    </div>
-    <div style="background:var(--surface);border-radius:7px;padding:10px;margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-size:11px;color:var(--txt3);font-weight:600">SUPABASE SQL SCHEMA</span>
-        <button class="btn btn-ghost btn-sm" onclick="copySQLSchema()">Copy SQL</button>
-      </div>
-      <pre style="font-size:10px;color:var(--txt2);overflow:auto;max-height:120px;font-family:monospace" id="sqlPreview"></pre>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Supabase Project URL</label>
-      <input class="form-input" id="sbUrl" placeholder="https://xxxxxxxxxxxx.supabase.co">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Supabase Anon Key</label>
-      <input class="form-input" id="sbKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
-    </div>
+    <div class="setup-step"><div class="step-num">1</div><div class="step-text">Go to <strong>supabase.com</strong> → Create a free account &amp; new project</div></div>
+    <div class="setup-step"><div class="step-num">2</div><div class="step-text">Open <strong>SQL Editor</strong> → New query → paste &amp; run the schema <button class="btn btn-ghost btn-sm" onclick="copySQL()" style="margin-left:6px">Copy SQL</button></div></div>
+    <div class="setup-step"><div class="step-num">3</div><div class="step-text">Go to <strong>Settings → API</strong> → copy Project URL &amp; anon key below</div></div>
+    <div style="background:var(--surface);border-radius:7px;padding:10px;margin:14px 0;font-family:monospace;font-size:10px;color:var(--txt2);white-space:pre;overflow:auto;max-height:80px" id="sqlBox"></div>
+    <div class="form-group"><label class="form-label">Supabase Project URL</label><input class="form-input" id="sbUrl" placeholder="https://xxxxxxxxxxxx.supabase.co"></div>
+    <div class="form-group"><label class="form-label">Supabase Anon Key</label><input class="form-input" id="sbKey" placeholder="eyJhbGci..."></div>
     <div class="form-actions">
-      <button class="btn btn-ghost" onclick="useDemoMode()">Use Demo Mode (local only)</button>
-      <button class="btn btn-primary" onclick="connectSupabase()">Connect & Sync 🚀</button>
+      <button class="btn btn-ghost" onclick="demoMode()">Use Demo Mode (local only)</button>
+      <button class="btn btn-primary" id="connectBtn" onclick="doConnect()">Connect &amp; Sync 🚀</button>
     </div>
   </div>
 </div>
 
-<!-- TOPIC DETAIL MODAL -->
+<!-- TOPIC MODAL -->
 <div class="modal-overlay hidden" id="topicModal">
   <div class="modal">
     <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:16px">
-      <div style="flex:1">
-        <div style="font-size:11px;color:var(--txt3);font-weight:600;margin-bottom:4px" id="modalTopicPhase"></div>
-        <h2 id="modalTopicName">Topic Name</h2>
-      </div>
-      <button onclick="closeTopicModal()" style="background:none;border:none;color:var(--txt2);cursor:pointer;font-size:18px">✕</button>
+      <div style="flex:1"><div style="font-size:11px;color:var(--txt3);font-weight:600;margin-bottom:4px" id="mPhase"></div><h2 id="mName"></h2></div>
+      <button onclick="closeTopicModal()" style="background:none;border:none;color:var(--txt2);cursor:pointer;font-size:18px;line-height:1">✕</button>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px" id="modalTopicTags"></div>
-    <p id="modalTopicDesc"></p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" id="mTags"></div>
+    <p id="mDesc" style="color:var(--txt2);font-size:13px;line-height:1.6;margin-bottom:16px"></p>
     <div class="divider"></div>
     <div style="font-size:12px;color:var(--txt2);margin-bottom:10px;font-weight:600">Update Status</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap" id="modalStatusBtns"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap" id="mBtns"></div>
     <div class="divider"></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
-      <button class="btn btn-ghost btn-sm" onclick="closeTopicModal()">Close</button>
-    </div>
+    <div style="display:flex;justify-content:flex-end"><button class="btn btn-ghost btn-sm" onclick="closeTopicModal()">Close</button></div>
   </div>
 </div>
 
-<!-- TOAST CONTAINER -->
-<div class="toast-container" id="toastContainer"></div>
+<div class="toast-container" id="toasts"></div>
 
 <script>
-/* ════════════════════════════════════════════════════════
-   SAP AI EXPERT DASHBOARD — MAIN SCRIPT
-   ════════════════════════════════════════════════════════ */
+// ═══════════════════════════════════════════════════
+// SAP AI EXPERT DASHBOARD
+// Supabase calls use raw fetch() — no SDK variable clash
+// ═══════════════════════════════════════════════════
 
-// ── CURRICULUM DATA ──────────────────────────────────────
-const PHASES = [
-  {
-    id: 1, name: "SAP Foundations & BTP Basics",
-    color: "#0ea5e9", weeks: [1,4],
-    desc: "Core SAP ecosystem, BTP fundamentals, and cloud basics",
-    topics: [
-      { id: "1_1", name: "SAP Ecosystem Overview", hrs: 1.5, desc: "SAP product portfolio, cloud vs on-premise, ERP landscape" },
-      { id: "1_2", name: "SAP BTP Architecture", hrs: 3, desc: "Business Technology Platform components, multi-cloud, account structure" },
-      { id: "1_3", name: "BTP Cockpit & Services", hrs: 3, desc: "Navigating BTP Cockpit, subaccounts, service instances, entitlements" },
-      { id: "1_4", name: "SAP Cloud Foundry Basics", hrs: 3, desc: "CF apps, buildpacks, manifests, CLI usage" },
-      { id: "1_5", name: "SAP HANA Cloud Fundamentals", hrs: 3, desc: "HANA database, SQL basics, HDI containers, data modeling" },
-      { id: "1_6", name: "OData & SAP APIs", hrs: 3, desc: "OData v4, SAP API Business Hub, Northbound/Southbound APIs" },
-      { id: "1_7", name: "SAP CAP (Cloud Application Programming)", hrs: 3, desc: "CDS, Node.js/Java CAP projects, service definitions" },
-      { id: "1_8", name: "SAP Authentication & Security", hrs: 3, desc: "XSUAA, OAuth 2.0, role collections, trust configurations" },
-    ]
-  },
-  {
-    id: 2, name: "AI & ML Fundamentals",
-    color: "#a855f7", weeks: [5,8],
-    desc: "Machine learning concepts, deep learning, and AI principles",
-    topics: [
-      { id: "2_1", name: "AI/ML Concepts & Terminology", hrs: 1.5, desc: "Supervised, unsupervised, reinforcement learning, key algorithms" },
-      { id: "2_2", name: "Python for Data Science", hrs: 3, desc: "NumPy, Pandas, Matplotlib, Seaborn for data analysis" },
-      { id: "2_3", name: "Machine Learning with scikit-learn", hrs: 3, desc: "Classification, regression, clustering, model evaluation" },
-      { id: "2_4", name: "Deep Learning Basics (TensorFlow/PyTorch)", hrs: 3, desc: "Neural networks, backpropagation, CNNs, RNNs basics" },
-      { id: "2_5", name: "Natural Language Processing (NLP)", hrs: 3, desc: "Tokenization, embeddings, transformers, BERT, GPT concepts" },
-      { id: "2_6", name: "Large Language Models (LLMs)", hrs: 3, desc: "LLM architecture, prompt engineering, fine-tuning, RAG patterns" },
-      { id: "2_7", name: "Computer Vision Basics", hrs: 3, desc: "Image processing, object detection, OpenCV, YOLO basics" },
-      { id: "2_8", name: "MLOps Fundamentals", hrs: 3, desc: "Model versioning, CI/CD for ML, monitoring, drift detection" },
-    ]
-  },
-  {
-    id: 3, name: "SAP AI Core & AI Services",
-    color: "#22c55e", weeks: [9,13],
-    desc: "SAP's AI platform, built-in AI services and ML ops on BTP",
-    topics: [
-      { id: "3_1", name: "SAP AI Core Architecture", hrs: 3, desc: "AI Core overview, resource groups, tenant model, plans" },
-      { id: "3_2", name: "Training & Deploying Models (AI Core)", hrs: 3, desc: "Pipelines, Docker containers, artifact management, deployments" },
-      { id: "3_3", name: "SAP AI Launchpad", hrs: 1.5, desc: "Managing AI scenarios, ML operations via UI" },
-      { id: "3_4", name: "SAP Document Information Extraction", hrs: 3, desc: "Document extraction service, custom schemas, REST API" },
-      { id: "3_5", name: "SAP Business AI Portfolio", hrs: 3, desc: "Intelligent scenarios across S/4HANA, SuccessFactors, Ariba" },
-      { id: "3_6", name: "SAP Conversational AI / SAP Build Apps", hrs: 3, desc: "Chatbot building, NLU training, webhook integration" },
-      { id: "3_7", name: "SAP Data Attribute Recommendation", hrs: 1.5, desc: "ML-powered data classification service" },
-      { id: "3_8", name: "SAP Translation Hub & Language Services", hrs: 1.5, desc: "Auto-translation, language detection APIs" },
-      { id: "3_9", name: "Generative AI Hub on BTP", hrs: 3, desc: "Generative AI Hub, model access, orchestration SDK" },
-    ]
-  },
-  {
-    id: 4, name: "SAP Joule & Generative AI Integration",
-    color: "#f59e0b", weeks: [14,18],
-    desc: "Joule AI copilot, Gen AI extensions, and LLM integration patterns",
-    topics: [
-      { id: "4_1", name: "SAP Joule Architecture & Extensibility", hrs: 3, desc: "Joule skills, side-by-side extensibility, Microsoft Copilot integration" },
-      { id: "4_2", name: "Prompt Engineering for SAP Contexts", hrs: 3, desc: "Few-shot prompting, system prompts, SAP-specific prompt patterns" },
-      { id: "4_3", name: "RAG (Retrieval Augmented Generation) on BTP", hrs: 3, desc: "Vector stores on HANA Cloud, LangChain, embedding pipelines" },
-      { id: "4_4", name: "SAP AI Core with OpenAI / Azure OpenAI", hrs: 3, desc: "Integrating third-party LLMs, model proxies, cost management" },
-      { id: "4_5", name: "Generative AI Orchestration Layer", hrs: 3, desc: "Content filtering, prompt templating, response caching, tracing" },
-      { id: "4_6", name: "Building AI-Powered SAP Extensions", hrs: 3, desc: "SAPUI5/Fiori + AI APIs, CAP with AI services, side-car patterns" },
-      { id: "4_7", name: "AI Ethics, Governance & Responsible AI", hrs: 1.5, desc: "EU AI Act, SAP AI ethics principles, explainability, bias detection" },
-      { id: "4_8", name: "Multi-Agent Systems on BTP", hrs: 3, desc: "Agentic patterns, tool use, LangGraph, autogen with SAP data" },
-    ]
-  },
-  {
-    id: 5, name: "Advanced Integration & Certification",
-    color: "#ef4444", weeks: [19,24],
-    desc: "Enterprise integration, advanced scenarios, exam prep and capstone project",
-    topics: [
-      { id: "5_1", name: "SAP Integration Suite with AI", hrs: 3, desc: "iFlow AI nodes, intelligent mapping, anomaly detection in integrations" },
-      { id: "5_2", name: "SAP Datasphere & AI Analytics", hrs: 3, desc: "Analytical models, SAP Analytics Cloud with augmented analytics" },
-      { id: "5_3", name: "AI Testing, Quality & Monitoring", hrs: 3, desc: "Evaluation frameworks, LLM tracing, hallucination detection, dashboards" },
-      { id: "5_4", name: "SAP BTP Security for AI Workloads", hrs: 3, desc: "Data privacy, PII handling, secure AI pipelines, compliance" },
-      { id: "5_5", name: "Performance Tuning & Cost Optimization", hrs: 3, desc: "Token optimization, caching strategies, model selection, BTP spend" },
-      { id: "5_6", name: "Capstone Project: End-to-End AI Solution", hrs: 6, desc: "Build a complete AI-powered SAP extension with Gen AI, RAG, and Joule integration" },
-      { id: "5_7", name: "SAP Certification Exam Prep (C_AI_900)", hrs: 3, desc: "SAP Certified Associate – SAP Business AI, past papers, topic review" },
-      { id: "5_8", name: "Architecture Patterns & Best Practices", hrs: 3, desc: "Reference architectures, SAP reference apps, design patterns review" },
-      { id: "5_9", name: "Mock Exams & Knowledge Review", hrs: 3, desc: "Practice tests, gap analysis, final revision of weak areas" },
-    ]
-  }
-];
-
-const MILESTONES = [
-  { week: 4, name: "BTP Basics Complete", phase: 1 },
-  { week: 8, name: "ML Fundamentals Mastered", phase: 2 },
-  { week: 13, name: "SAP AI Services Expert", phase: 3 },
-  { week: 18, name: "Joule & Gen AI Ready", phase: 4 },
-  { week: 22, name: "Capstone Complete", phase: 5 },
-  { week: 24, name: "🏆 SAP AI Expert Certified", phase: 5 },
-];
-
-const DEFAULT_RESOURCES = [
-  { id: 'dr1', title: 'SAP BTP Documentation', type: 'link', url: 'https://help.sap.com/docs/btp', phase: '1', desc: 'Official SAP BTP product documentation and guides' },
-  { id: 'dr2', title: 'SAP AI Core Documentation', type: 'link', url: 'https://help.sap.com/docs/ai-core', phase: '3', desc: 'Complete guide to SAP AI Core — training, deploying, serving models' },
-  { id: 'dr3', title: 'SAP Generative AI Hub', type: 'link', url: 'https://help.sap.com/docs/sap-ai-core/sap-ai-core-service-guide/generative-ai-hub-in-sap-ai-core', phase: '4', desc: 'Generative AI Hub access, model catalog, orchestration SDK' },
-  { id: 'dr4', title: 'SAP Learning Journey: AI Foundation', type: 'course', url: 'https://learning.sap.com/learning-journeys/explore-sap-business-ai', phase: '1', desc: 'Free official SAP learning path for Business AI fundamentals' },
-  { id: 'dr5', title: 'Fast.ai Practical Deep Learning', type: 'course', url: 'https://course.fast.ai', phase: '2', desc: 'Excellent free course — top-down approach to deep learning' },
-  { id: 'dr6', title: 'SAP API Business Hub', type: 'tool', url: 'https://api.sap.com', phase: '1', desc: 'Discover and test SAP APIs — OData, REST, event APIs' },
-  { id: 'dr7', title: 'Hugging Face Transformers Docs', type: 'link', url: 'https://huggingface.co/docs/transformers', phase: '2', desc: 'State-of-the-art ML models, tokenizers, pipelines' },
-  { id: 'dr8', title: 'SAP Tutorials: AI Core Hands-on', type: 'link', url: 'https://developers.sap.com/mission.ai-core-get-started.html', phase: '3', desc: 'Step-by-step tutorials for SAP AI Core on SAP Developer Center' },
-  { id: 'dr9', title: 'LangChain Documentation', type: 'link', url: 'https://python.langchain.com/docs/introduction', phase: '4', desc: 'Framework for building LLM applications — RAG, agents, chains' },
-  { id: 'dr10', title: 'SAP Joule Documentation', type: 'link', url: 'https://help.sap.com/docs/joule', phase: '4', desc: 'SAP Joule AI copilot — architecture, skills, extensibility' },
-];
-
-const STUDY_TIPS = [
-  "🧠 Use spaced repetition — revisit yesterday's topic for 15 min before starting new material",
-  "✍️ Take notes in your own words immediately after each session",
-  "🏗️ Build something after every phase — coding beats reading 10:1",
-  "🔗 Always link SAP concepts to real business problems you know",
-  "⏰ Pomodoro: 25 min focus + 5 min break fits perfectly in your 1.5h slot",
-  "📱 Listen to SAP Inside Track / TechEd talks during commutes",
-  "🤝 Join SAP Community forums — answering questions cements knowledge",
-  "🎯 Set a micro-goal before each session: 'I will understand X by end of this session'",
-];
-
-// ── STATE ────────────────────────────────────────────────
-let state = {
-  topicStatus: {}, // { topicId: 'todo'|'inprogress'|'done' }
-  checkIns: [],    // ['2024-01-15', ...]
-  notes: [],       // [{id, title, body, tag, updatedAt}]
-  resources: [],   // [{id, title, type, url, phase, desc}]
-  startDate: null, // ISO date string
-  settings: { sbUrl: '', sbKey: '', demo: false }
-};
-
-let _db = null; // renamed to avoid clash with window.supabase from CDN
-let currentNoteId = null;
-let saveTimer = null;
-let activeResourceFilter = '';
-let previewMode = false;
-
-// ── SUPABASE SQL SCHEMA ──────────────────────────────────
-const SQL_SCHEMA = `-- Run this in Supabase SQL Editor
-create table if not exists sap_progress (
+const SQL_SCHEMA = `create table if not exists sap_progress (
   key text primary key,
   value jsonb,
   updated_at timestamptz default now()
-);
--- Enable Row Level Security (optional but recommended)
--- alter table sap_progress enable row level security;
--- create policy "Allow all" on sap_progress for all using (true);`;
+);`;
 
-// ── INIT ─────────────────────────────────────────────────
-async function init() {
-  updateHeaderDate();
-  document.getElementById('sqlPreview').textContent = SQL_SCHEMA;
+// ── CURRICULUM ────────────────────────────────────
+const PHASES = [
+  { id:1, name:"SAP Foundations & BTP Basics", color:"#0ea5e9", weeks:[1,4],
+    topics:[
+      {id:"1_1",name:"SAP Ecosystem Overview",hrs:1.5,desc:"SAP product portfolio, cloud vs on-premise, ERP landscape"},
+      {id:"1_2",name:"SAP BTP Architecture",hrs:3,desc:"Business Technology Platform components, multi-cloud, account structure"},
+      {id:"1_3",name:"BTP Cockpit & Services",hrs:3,desc:"Navigating BTP Cockpit, subaccounts, service instances, entitlements"},
+      {id:"1_4",name:"SAP Cloud Foundry Basics",hrs:3,desc:"CF apps, buildpacks, manifests, CLI usage"},
+      {id:"1_5",name:"SAP HANA Cloud Fundamentals",hrs:3,desc:"HANA database, SQL basics, HDI containers, data modeling"},
+      {id:"1_6",name:"OData & SAP APIs",hrs:3,desc:"OData v4, SAP API Business Hub, Northbound/Southbound APIs"},
+      {id:"1_7",name:"SAP CAP (Cloud Application Programming)",hrs:3,desc:"CDS, Node.js/Java CAP projects, service definitions"},
+      {id:"1_8",name:"SAP Authentication & Security",hrs:3,desc:"XSUAA, OAuth 2.0, role collections, trust configurations"},
+    ]},
+  { id:2, name:"AI & ML Fundamentals", color:"#a855f7", weeks:[5,8],
+    topics:[
+      {id:"2_1",name:"AI/ML Concepts & Terminology",hrs:1.5,desc:"Supervised, unsupervised, reinforcement learning, key algorithms"},
+      {id:"2_2",name:"Python for Data Science",hrs:3,desc:"NumPy, Pandas, Matplotlib, Seaborn for data analysis"},
+      {id:"2_3",name:"Machine Learning with scikit-learn",hrs:3,desc:"Classification, regression, clustering, model evaluation"},
+      {id:"2_4",name:"Deep Learning Basics",hrs:3,desc:"Neural networks, backpropagation, CNNs, RNNs basics"},
+      {id:"2_5",name:"Natural Language Processing (NLP)",hrs:3,desc:"Tokenization, embeddings, transformers, BERT, GPT concepts"},
+      {id:"2_6",name:"Large Language Models (LLMs)",hrs:3,desc:"LLM architecture, prompt engineering, fine-tuning, RAG patterns"},
+      {id:"2_7",name:"Computer Vision Basics",hrs:3,desc:"Image processing, object detection, OpenCV, YOLO basics"},
+      {id:"2_8",name:"MLOps Fundamentals",hrs:3,desc:"Model versioning, CI/CD for ML, monitoring, drift detection"},
+    ]},
+  { id:3, name:"SAP AI Core & AI Services", color:"#22c55e", weeks:[9,13],
+    topics:[
+      {id:"3_1",name:"SAP AI Core Architecture",hrs:3,desc:"AI Core overview, resource groups, tenant model, plans"},
+      {id:"3_2",name:"Training & Deploying Models",hrs:3,desc:"Pipelines, Docker containers, artifact management, deployments"},
+      {id:"3_3",name:"SAP AI Launchpad",hrs:1.5,desc:"Managing AI scenarios, ML operations via UI"},
+      {id:"3_4",name:"Document Information Extraction",hrs:3,desc:"Document extraction service, custom schemas, REST API"},
+      {id:"3_5",name:"SAP Business AI Portfolio",hrs:3,desc:"Intelligent scenarios across S/4HANA, SuccessFactors, Ariba"},
+      {id:"3_6",name:"SAP Conversational AI",hrs:3,desc:"Chatbot building, NLU training, webhook integration"},
+      {id:"3_7",name:"Data Attribute Recommendation",hrs:1.5,desc:"ML-powered data classification service"},
+      {id:"3_8",name:"SAP Language Services",hrs:1.5,desc:"Auto-translation, language detection APIs"},
+      {id:"3_9",name:"Generative AI Hub on BTP",hrs:3,desc:"Generative AI Hub, model access, orchestration SDK"},
+    ]},
+  { id:4, name:"SAP Joule & Generative AI", color:"#f59e0b", weeks:[14,18],
+    topics:[
+      {id:"4_1",name:"SAP Joule Architecture & Extensibility",hrs:3,desc:"Joule skills, side-by-side extensibility, Microsoft Copilot integration"},
+      {id:"4_2",name:"Prompt Engineering for SAP",hrs:3,desc:"Few-shot prompting, system prompts, SAP-specific prompt patterns"},
+      {id:"4_3",name:"RAG on BTP",hrs:3,desc:"Vector stores on HANA Cloud, LangChain, embedding pipelines"},
+      {id:"4_4",name:"SAP AI Core with OpenAI",hrs:3,desc:"Integrating third-party LLMs, model proxies, cost management"},
+      {id:"4_5",name:"Generative AI Orchestration Layer",hrs:3,desc:"Content filtering, prompt templating, response caching, tracing"},
+      {id:"4_6",name:"Building AI-Powered SAP Extensions",hrs:3,desc:"SAPUI5/Fiori + AI APIs, CAP with AI services, side-car patterns"},
+      {id:"4_7",name:"AI Ethics & Responsible AI",hrs:1.5,desc:"EU AI Act, SAP AI ethics principles, explainability, bias detection"},
+      {id:"4_8",name:"Multi-Agent Systems on BTP",hrs:3,desc:"Agentic patterns, tool use, LangGraph, autogen with SAP data"},
+    ]},
+  { id:5, name:"Advanced Integration & Certification", color:"#ef4444", weeks:[19,24],
+    topics:[
+      {id:"5_1",name:"SAP Integration Suite with AI",hrs:3,desc:"iFlow AI nodes, intelligent mapping, anomaly detection"},
+      {id:"5_2",name:"SAP Datasphere & AI Analytics",hrs:3,desc:"Analytical models, SAP Analytics Cloud with augmented analytics"},
+      {id:"5_3",name:"AI Testing & Monitoring",hrs:3,desc:"Evaluation frameworks, LLM tracing, hallucination detection"},
+      {id:"5_4",name:"SAP BTP Security for AI",hrs:3,desc:"Data privacy, PII handling, secure AI pipelines, compliance"},
+      {id:"5_5",name:"Performance & Cost Optimization",hrs:3,desc:"Token optimization, caching, model selection, BTP spend"},
+      {id:"5_6",name:"Capstone: End-to-End AI Solution",hrs:6,desc:"Build a complete AI-powered SAP extension with Gen AI, RAG, and Joule"},
+      {id:"5_7",name:"SAP Certification Exam Prep",hrs:3,desc:"SAP Certified Associate – Business AI, past papers, topic review"},
+      {id:"5_8",name:"Architecture Patterns & Best Practices",hrs:3,desc:"Reference architectures, SAP reference apps, design patterns"},
+      {id:"5_9",name:"Mock Exams & Knowledge Review",hrs:3,desc:"Practice tests, gap analysis, final revision of weak areas"},
+    ]},
+];
 
-  const saved = localStorage.getItem('sap_settings');
-  if (saved) {
-    try {
-      const settings = JSON.parse(saved);
-      state.settings = { ...state.settings, ...settings };
-    } catch(e) {}
-  }
+const MILESTONES = [
+  {week:4,name:"BTP Basics Complete",phase:1},
+  {week:8,name:"ML Fundamentals Mastered",phase:2},
+  {week:13,name:"SAP AI Services Expert",phase:3},
+  {week:18,name:"Joule & Gen AI Ready",phase:4},
+  {week:22,name:"Capstone Project Complete",phase:5},
+  {week:24,name:"🏆 SAP AI Expert Certified",phase:5},
+];
 
-  if (state.settings.sbUrl && state.settings.sbKey) {
-    await connectSupabase(true);
-  } else if (state.settings.demo) {
-    loadLocalState();
-    hideSetupModal();
-    renderAll();
-  } else {
-    document.getElementById('setupModal').classList.remove('hidden');
-  }
-}
+const DEFAULT_RESOURCES = [
+  {id:'dr1',title:'SAP BTP Documentation',type:'link',url:'https://help.sap.com/docs/btp',phase:'1',desc:'Official SAP BTP product documentation'},
+  {id:'dr2',title:'SAP AI Core Documentation',type:'link',url:'https://help.sap.com/docs/ai-core',phase:'3',desc:'Complete guide to SAP AI Core'},
+  {id:'dr3',title:'SAP Generative AI Hub',type:'link',url:'https://help.sap.com/docs/sap-ai-core/sap-ai-core-service-guide/generative-ai-hub-in-sap-ai-core',phase:'4',desc:'Generative AI Hub access, model catalog, orchestration SDK'},
+  {id:'dr4',title:'SAP Learning: AI Foundation',type:'course',url:'https://learning.sap.com/learning-journeys/explore-sap-business-ai',phase:'1',desc:'Free official SAP learning path for Business AI'},
+  {id:'dr5',title:'Fast.ai Practical Deep Learning',type:'course',url:'https://course.fast.ai',phase:'2',desc:'Excellent free top-down deep learning course'},
+  {id:'dr6',title:'SAP API Business Hub',type:'tool',url:'https://api.sap.com',phase:'1',desc:'Discover and test SAP APIs'},
+  {id:'dr7',title:'Hugging Face Transformers',type:'link',url:'https://huggingface.co/docs/transformers',phase:'2',desc:'State-of-the-art ML models and pipelines'},
+  {id:'dr8',title:'SAP Tutorials: AI Core Hands-on',type:'link',url:'https://developers.sap.com/mission.ai-core-get-started.html',phase:'3',desc:'Step-by-step SAP AI Core tutorials'},
+  {id:'dr9',title:'LangChain Documentation',type:'link',url:'https://python.langchain.com/docs/introduction',phase:'4',desc:'Framework for building LLM applications'},
+  {id:'dr10',title:'SAP Joule Documentation',type:'link',url:'https://help.sap.com/docs/joule',phase:'4',desc:'SAP Joule AI copilot architecture and extensibility'},
+];
 
-function updateHeaderDate() {
-  const now = new Date();
-  const opts = { weekday:'short', month:'short', day:'numeric' };
-  document.getElementById('headerDate').textContent = now.toLocaleDateString('en-IN', opts);
-}
+const TIPS = [
+  "🧠 Spaced repetition — revisit yesterday's topic for 15 min before new material",
+  "✍️ Take notes in your own words immediately after each session",
+  "🏗️ Build something after every phase — coding beats reading 10:1",
+  "🔗 Always link SAP concepts to real business problems you know",
+  "⏰ Pomodoro: 25 min focus + 5 min break fits perfectly in 1.5h slot",
+  "📱 Listen to SAP Inside Track / TechEd talks during commutes",
+  "🤝 Join SAP Community forums — answering questions cements knowledge",
+];
 
-// ── SUPABASE ─────────────────────────────────────────────
-async function connectSupabase(silent = false) {
-  const url = document.getElementById('sbUrl')?.value?.trim() || state.settings.sbUrl;
-  const key = document.getElementById('sbKey')?.value?.trim() || state.settings.sbKey;
+// ── STATE ─────────────────────────────────────────
+var ST = {
+  topicStatus: {},
+  checkIns: [],
+  notes: [],
+  resources: [],
+  startDate: null,
+  cfg: { url:'', key:'', demo:false }
+};
+var activeTopic = null;
+var activeNote = null;
+var resFilter = '';
+var saveTimer = null;
+var prevMode = false;
 
-  if (!url || !key) { if(!silent) toast('Please enter both URL and Key', 'error'); return; }
-
-  try {
-    const { createClient } = window.supabase;
-    _db = createClient(url, key);
-    // Test connection — if table missing, show helpful message
-    const { error } = await _db.from('sap_progress').select('key').limit(1);
-    if (error) {
-      if (error.code === '42P01' || (error.message && error.message.includes('does not exist'))) {
-        throw new Error('Table not found. Please run the SQL schema in Supabase SQL Editor first, then try again.');
-      }
-      throw error;
-    }
-
-    state.settings = { sbUrl: url, sbKey: key, demo: false };
-    localStorage.setItem('sap_settings', JSON.stringify(state.settings));
-
-    await loadFromSupabase();
-    hideSetupModal();
-    setSyncStatus('ok', 'Synced');
-    if (!silent) toast('Connected to Supabase! 🎉', 'success');
-    renderAll();
-  } catch(e) {
-    console.error(e);
-    setSyncStatus('err', 'Error');
-    if (!silent) toast('Connection failed: ' + (e.message || 'Check URL and key'), 'error');
-    else {
-      // fall back to local
-      loadLocalState();
-      hideSetupModal();
-      setSyncStatus('err', 'Offline');
-      renderAll();
-    }
-  }
-}
-
-async function loadFromSupabase() {
-  const keys = ['topicStatus','checkIns','notes','resources','startDate'];
-  const { data, error } = await _db.from('sap_progress').select('key,value').in('key', keys);
-  if (error) throw error;
-  data.forEach(row => {
-    if (row.key === 'startDate') state.startDate = row.value;
-    else state[row.key] = row.value;
+// ── SUPABASE via raw fetch (NO SDK variable) ──────
+async function sbGet(key) {
+  var r = await fetch(ST.cfg.url + '/rest/v1/sap_progress?key=eq.' + encodeURIComponent(key) + '&select=key,value', {
+    headers: { 'apikey': ST.cfg.key, 'Authorization': 'Bearer ' + ST.cfg.key }
   });
-  // Merge default resources if none stored
-  if (!state.resources || state.resources.length === 0) {
-    state.resources = [...DEFAULT_RESOURCES];
-  }
-  if (!state.startDate) {
-    state.startDate = new Date().toISOString().split('T')[0];
-    await saveToSupabase('startDate', state.startDate);
-  }
+  if (!r.ok) throw new Error('GET failed: ' + r.status + ' ' + await r.text());
+  var rows = await r.json();
+  return rows.length ? rows[0].value : null;
 }
 
-async function saveToSupabase(key, value) {
-  if (!_db) { saveLocally(); return; }
+async function sbSet(key, value) {
+  var r = await fetch(ST.cfg.url + '/rest/v1/sap_progress', {
+    method: 'POST',
+    headers: {
+      'apikey': ST.cfg.key,
+      'Authorization': 'Bearer ' + ST.cfg.key,
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=merge-duplicates'
+    },
+    body: JSON.stringify({ key: key, value: value, updated_at: new Date().toISOString() })
+  });
+  if (!r.ok) throw new Error('SET failed: ' + r.status + ' ' + await r.text());
+}
+
+async function sbTest() {
+  var r = await fetch(ST.cfg.url + '/rest/v1/sap_progress?limit=1', {
+    headers: { 'apikey': ST.cfg.key, 'Authorization': 'Bearer ' + ST.cfg.key }
+  });
+  if (!r.ok) {
+    var txt = await r.text();
+    if (txt.includes('does not exist') || txt.includes('42P01')) throw new Error('Table not found — please run the SQL schema first');
+    throw new Error('Auth failed (' + r.status + ') — check your URL and key');
+  }
+  return true;
+}
+
+// ── INIT ──────────────────────────────────────────
+window.addEventListener('load', function() {
+  document.getElementById('hDate').textContent = new Date().toLocaleDateString('en-IN',{weekday:'short',month:'short',day:'numeric'});
+  document.getElementById('sqlBox').textContent = SQL_SCHEMA;
+
+  var saved = localStorage.getItem('sap_cfg');
+  if (saved) { try { ST.cfg = JSON.parse(saved); } catch(e){} }
+
+  if (ST.cfg.url && ST.cfg.key) {
+    autoConnect();
+  } else if (ST.cfg.demo) {
+    loadLocal();
+    closeSetup();
+    renderAll();
+  }
+  // else setup modal stays visible (it's open by default)
+});
+
+async function autoConnect() {
   try {
-    await _db.from('sap_progress').upsert({ key, value, updated_at: new Date().toISOString() });
-    setSyncStatus('ok', 'Synced');
+    await sbTest();
+    await loadRemote();
+    closeSetup();
+    setSyncOk();
+    renderAll();
   } catch(e) {
-    setSyncStatus('err', 'Sync error');
-    saveLocally();
+    loadLocal();
+    closeSetup();
+    setSyncErr('Offline');
+    renderAll();
   }
 }
 
-function saveLocally() {
-  localStorage.setItem('sap_state', JSON.stringify(state));
-}
-
-function loadLocalState() {
-  const s = localStorage.getItem('sap_state');
-  if (s) {
-    try {
-      const parsed = JSON.parse(s);
-      state = { ...state, ...parsed };
-    } catch(e) {}
+async function loadRemote() {
+  var keys = ['topicStatus','checkIns','notes','resources','startDate'];
+  for (var i = 0; i < keys.length; i++) {
+    var v = await sbGet(keys[i]);
+    if (v !== null) ST[keys[i]] = v;
   }
-  if (!state.resources || state.resources.length === 0) state.resources = [...DEFAULT_RESOURCES];
-  if (!state.startDate) state.startDate = new Date().toISOString().split('T')[0];
-  if (!state.notes) state.notes = [];
-  if (!state.checkIns) state.checkIns = [];
-  if (!state.topicStatus) state.topicStatus = {};
+  if (!ST.resources || ST.resources.length === 0) ST.resources = DEFAULT_RESOURCES.slice();
+  if (!ST.startDate) {
+    ST.startDate = today();
+    await sbSet('startDate', ST.startDate);
+  }
 }
 
-async function persistState(key) {
-  if (_db) await saveToSupabase(key, state[key]);
-  else saveLocally();
+async function persist(key) {
+  saveLocal();
+  if (ST.cfg.url && ST.cfg.key && !ST.cfg.demo) {
+    try { await sbSet(key, ST[key]); setSyncOk(); }
+    catch(e) { setSyncErr('Sync error'); }
+  }
 }
 
-function setSyncStatus(status, label) {
-  const dot = document.getElementById('syncDot');
-  const lbl = document.getElementById('syncLabel');
-  dot.className = 'sync-dot ' + status;
-  lbl.textContent = label;
+function saveLocal() { localStorage.setItem('sap_state', JSON.stringify(ST)); }
+function loadLocal() {
+  var s = localStorage.getItem('sap_state');
+  if (s) { try { var p = JSON.parse(s); Object.assign(ST, p); } catch(e){} }
+  if (!ST.resources || ST.resources.length === 0) ST.resources = DEFAULT_RESOURCES.slice();
+  if (!ST.startDate) ST.startDate = today();
+  if (!ST.notes) ST.notes = [];
+  if (!ST.checkIns) ST.checkIns = [];
+  if (!ST.topicStatus) ST.topicStatus = {};
 }
 
-function useDemoMode() {
-  state.settings.demo = true;
-  localStorage.setItem('sap_settings', JSON.stringify(state.settings));
-  loadLocalState();
-  hideSetupModal();
-  setSyncStatus('', 'Local mode');
+function today() { return new Date().toISOString().split('T')[0]; }
+function setSyncOk() { document.getElementById('syncDot').className='sync-dot ok'; document.getElementById('syncLbl').textContent='Synced'; }
+function setSyncErr(t) { document.getElementById('syncDot').className='sync-dot err'; document.getElementById('syncLbl').textContent=t||'Error'; }
+
+// ── CONNECT ───────────────────────────────────────
+async function doConnect() {
+  var btn = document.getElementById('connectBtn');
+  var url = (document.getElementById('sbUrl').value||'').trim().replace(/\/+$/,'');
+  var key = (document.getElementById('sbKey').value||'').trim();
+  if (!url || !key) { toast('Please enter both URL and anon key','error'); return; }
+  btn.textContent = 'Connecting...'; btn.disabled = true;
+  try {
+    ST.cfg = { url:url, key:key, demo:false };
+    await sbTest();
+    localStorage.setItem('sap_cfg', JSON.stringify(ST.cfg));
+    await loadRemote();
+    closeSetup();
+    setSyncOk();
+    renderAll();
+    toast('Connected to Supabase! 🎉','success');
+  } catch(e) {
+    toast(e.message || 'Connection failed','error');
+    ST.cfg = { url:'', key:'', demo:false };
+  } finally {
+    btn.textContent = 'Connect & Sync 🚀'; btn.disabled = false;
+  }
+}
+
+function demoMode() {
+  ST.cfg.demo = true;
+  localStorage.setItem('sap_cfg', JSON.stringify(ST.cfg));
+  loadLocal();
+  closeSetup();
+  document.getElementById('syncLbl').textContent = 'Local mode';
   renderAll();
-  toast('Running in local mode — data stays on this device', 'info');
+  toast('Running in local mode — data stays on this device','info');
 }
 
-function hideSetupModal() {
-  document.getElementById('setupModal').classList.add('hidden');
-}
+function closeSetup() { document.getElementById('setupModal').classList.add('hidden'); }
 function openSettings() {
-  document.getElementById('sbUrl').value = state.settings.sbUrl || '';
-  document.getElementById('sbKey').value = state.settings.sbKey || '';
+  document.getElementById('sbUrl').value = ST.cfg.url || '';
+  document.getElementById('sbKey').value = ST.cfg.key || '';
   document.getElementById('setupModal').classList.remove('hidden');
 }
 
-// ── ROUTING ──────────────────────────────────────────────
-function switchTab(tab) {
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('panel-' + tab).classList.add('active');
-  document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+function copySQL() {
+  navigator.clipboard.writeText(SQL_SCHEMA).then(function(){ toast('SQL copied!','success'); });
 }
 
-// ── RENDER ALL ───────────────────────────────────────────
+// ── TABS ──────────────────────────────────────────
+function goTab(t) {
+  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active')});
+  document.querySelectorAll('.nav-tab').forEach(function(n){n.classList.remove('active')});
+  document.getElementById('panel-'+t).classList.add('active');
+  document.querySelector('[data-tab="'+t+'"]').classList.add('active');
+}
+
+// ── RENDER ALL ────────────────────────────────────
 function renderAll() {
-  renderDashboard();
+  renderDash();
   renderTopics();
   renderGantt();
   renderResources();
-  renderNotesList();
+  renderNotes();
   renderSchedule();
 }
 
-// ── DASHBOARD ────────────────────────────────────────────
-function renderDashboard() {
-  const allTopics = PHASES.flatMap(p => p.topics);
-  const total = allTopics.length;
-  const done = allTopics.filter(t => state.topicStatus[t.id] === 'done').length;
-  const pct = total ? Math.round(done/total*100) : 0;
+// ── DASHBOARD ─────────────────────────────────────
+function allTopics() { return PHASES.reduce(function(a,p){return a.concat(p.topics)},[]); }
 
-  document.getElementById('statProgress').textContent = pct + '%';
-  document.getElementById('statProgressSub').textContent = `${done} of ${total} topics done`;
-  document.getElementById('progressFill').style.width = pct + '%';
-
-  // Streak
-  const streak = calcStreak();
-  document.getElementById('statStreak').textContent = streak;
-
-  // Hours
-  const hrs = allTopics.filter(t => state.topicStatus[t.id] === 'done').reduce((a,t) => a + t.hrs, 0);
-  document.getElementById('statHours').textContent = hrs + 'h';
-  document.getElementById('statHoursSub').textContent = `Target: 120h total`;
-
-  // Days remaining
-  if (state.startDate) {
-    const start = new Date(state.startDate);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 24*7); // 24 weeks
-    const today = new Date();
-    const diff = Math.max(0, Math.ceil((end - today)/(1000*60*60*24)));
-    document.getElementById('statDays').textContent = diff;
-    document.getElementById('statDaysSub').textContent = `Target: ${end.toLocaleDateString('en-IN',{month:'short',day:'numeric',year:'numeric'})}`;
+function renderDash() {
+  var all = allTopics();
+  var done = all.filter(function(t){return ST.topicStatus[t.id]==='done'}).length;
+  var pct = all.length ? Math.round(done/all.length*100) : 0;
+  document.getElementById('sPct').textContent = pct+'%';
+  document.getElementById('sSub').textContent = done+' of '+all.length+' done';
+  document.getElementById('sFill').style.width = pct+'%';
+  document.getElementById('sStreak').textContent = calcStreak();
+  var hrs = all.filter(function(t){return ST.topicStatus[t.id]==='done'}).reduce(function(a,t){return a+t.hrs},0);
+  document.getElementById('sHrs').textContent = hrs+'h';
+  if (ST.startDate) {
+    var end = new Date(ST.startDate); end.setDate(end.getDate()+168);
+    var diff = Math.max(0,Math.ceil((end-new Date())/86400000));
+    document.getElementById('sDays').textContent = diff;
+    document.getElementById('sDaysSub').textContent = 'Target: '+end.toLocaleDateString('en-IN',{month:'short',day:'numeric',year:'numeric'});
   }
-
   // Phase progress
-  const pp = document.getElementById('phaseProgress');
-  pp.innerHTML = '';
-  PHASES.forEach(phase => {
-    const topics = phase.topics;
-    const d = topics.filter(t => state.topicStatus[t.id] === 'done').length;
-    const p = topics.length ? Math.round(d/topics.length*100) : 0;
-    pp.innerHTML += `
-      <div style="margin-bottom:12px">
-        <div class="progress-label">
-          <span style="color:${phase.color};font-weight:600">Phase ${phase.id}: ${phase.name}</span>
-          <span>${d}/${topics.length} · ${p}%</span>
-        </div>
-        <div class="progress-bar"><div class="progress-fill" style="width:${p}%;background:${phase.color}"></div></div>
-      </div>`;
+  var pp = document.getElementById('phaseProg'); pp.innerHTML='';
+  PHASES.forEach(function(ph) {
+    var d = ph.topics.filter(function(t){return ST.topicStatus[t.id]==='done'}).length;
+    var p = Math.round(d/ph.topics.length*100);
+    pp.innerHTML += '<div style="margin-bottom:12px"><div class="progress-label"><span style="color:'+ph.color+';font-weight:600">Phase '+ph.id+': '+ph.name+'</span><span>'+d+'/'+ph.topics.length+' · '+p+'%</span></div><div class="progress-bar"><div class="progress-fill" style="width:'+p+'%;background:'+ph.color+'"></div></div></div>';
   });
-
-  // Current focus
-  const cf = document.getElementById('currentFocusCard');
-  const inProgress = allTopics.filter(t => state.topicStatus[t.id] === 'inprogress');
-  const nextUp = allTopics.find(t => !state.topicStatus[t.id] || state.topicStatus[t.id] === 'todo');
-  const focus = inProgress[0] || nextUp;
+  // Week card
+  var wc = document.getElementById('weekCard');
+  var wd = new Date(); var ws = new Date(wd); ws.setDate(wd.getDate()-(wd.getDay()||7)+1);
+  var days = Array.from({length:7},function(_,i){var d=new Date(ws);d.setDate(ws.getDate()+i);return d});
+  var ci = ST.checkIns||[];
+  var html = '<div style="display:flex;gap:6px;margin-bottom:12px">';
+  days.forEach(function(d,i){
+    var iso=d.toISOString().split('T')[0];
+    var isTod=iso===today(),isDone=ci.includes(iso),isWE=d.getDay()===0||d.getDay()===6;
+    html+='<div style="flex:1;text-align:center;padding:8px 4px;border-radius:7px;border:1px solid '+(isTod?'var(--accent)':isDone?'var(--green)':'var(--border)')+';background:'+(isDone?'rgba(34,197,94,.08)':isTod?'rgba(14,165,233,.08)':'transparent')+'"><div style="font-size:10px;color:var(--txt3)">'+['M','T','W','T','F','S','S'][i]+'</div><div style="font-size:13px;font-weight:600;color:'+(isDone?'var(--green)':isTod?'var(--accent)':'var(--txt)')+'">'+d.getDate()+'</div><div style="font-size:10px;color:'+(isWE?'var(--purple)':'var(--accent)')+'">'+( isWE?'2h':'1.5h')+'</div><div style="width:6px;height:6px;border-radius:50%;margin:4px auto 0;background:'+(isDone?'var(--green)':'var(--border)')+'"></div></div>';
+  });
+  var weekDone = days.filter(function(d){return ci.includes(d.toISOString().split('T')[0])}).length;
+  html += '</div><div style="font-size:13px;color:var(--txt2)">'+weekDone+'/7 days checked in this week</div>';
+  wc.innerHTML = html;
+  // Focus
+  var fc = document.getElementById('focusCard');
+  var inp = allTopics().filter(function(t){return ST.topicStatus[t.id]==='inprogress'});
+  var next = allTopics().find(function(t){return !ST.topicStatus[t.id]||ST.topicStatus[t.id]==='todo'});
+  var focus = inp[0]||next;
   if (focus) {
-    const phase = PHASES.find(p => p.topics.some(t => t.id === focus.id));
-    cf.innerHTML = `
-      <div style="border-left:3px solid ${phase?.color || 'var(--accent)'};padding-left:12px">
-        <div class="tag phase${phase?.id}" style="margin-bottom:8px">Phase ${phase?.id}: ${phase?.name}</div>
-        <div style="font-size:15px;font-weight:600;margin-bottom:4px">${focus.name}</div>
-        <div style="font-size:12px;color:var(--txt2);margin-bottom:10px">${focus.desc}</div>
-        <div style="font-size:11px;color:var(--txt3)">⏱ ${focus.hrs}h estimated</div>
-      </div>`;
-  } else {
-    cf.innerHTML = '<div class="empty-state"><div>🏆</div><p>All topics complete!</p></div>';
-  }
-
-  // This week
-  const tw = document.getElementById('thisWeekCard');
-  const today = new Date();
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - today.getDay() + 1);
-  const days = Array.from({length:7}, (_,i) => {
-    const d = new Date(weekStart);
-    d.setDate(weekStart.getDate() + i);
-    return d;
-  });
-  const ci = state.checkIns || [];
-  const weekDone = days.filter(d => ci.includes(d.toISOString().split('T')[0])).length;
-  tw.innerHTML = `
-    <div style="display:flex;gap:6px;margin-bottom:12px">
-      ${days.map(d => {
-        const iso = d.toISOString().split('T')[0];
-        const isToday = iso === today.toISOString().split('T')[0];
-        const isDone = ci.includes(iso);
-        const isWeekend = d.getDay()===0||d.getDay()===6;
-        return `<div style="flex:1;text-align:center;padding:8px 4px;border-radius:7px;border:1px solid ${isToday?'var(--accent)':isDone?'var(--green)':'var(--border)'};background:${isDone?'rgba(34,197,94,.08)':isToday?'rgba(14,165,233,.08)':'transparent'}">
-          <div style="font-size:10px;color:var(--txt3)">${['M','T','W','T','F','S','S'][days.indexOf(d)]}</div>
-          <div style="font-size:13px;font-weight:600;color:${isDone?'var(--green)':isToday?'var(--accent)':'var(--txt)'}">${d.getDate()}</div>
-          <div style="font-size:10px;color:${isWeekend?'var(--purple)':'var(--accent)'}">${isWeekend?'2h':'1.5h'}</div>
-          <div style="width:6px;height:6px;border-radius:50%;margin:4px auto 0;background:${isDone?'var(--green)':'var(--border)'}"></div>
-        </div>`;
-      }).join('')}
-    </div>
-    <div style="font-size:13px;color:var(--txt2)">${weekDone}/7 days checked in this week</div>
-  `;
+    var ph = PHASES.find(function(p){return p.topics.some(function(t){return t.id===focus.id})});
+    fc.innerHTML='<div style="border-left:3px solid '+ph.color+';padding-left:12px"><div class="tag p'+ph.id+'" style="margin-bottom:8px">Phase '+ph.id+': '+ph.name+'</div><div style="font-size:15px;font-weight:600;margin-bottom:4px">'+focus.name+'</div><div style="font-size:12px;color:var(--txt2);margin-bottom:10px">'+focus.desc+'</div><div style="font-size:11px;color:var(--txt3)">⏱ '+focus.hrs+'h estimated</div></div>';
+  } else { fc.innerHTML='<div class="empty-state"><div>🏆</div><p>All topics complete!</p></div>'; }
 }
 
 function calcStreak() {
-  const ci = (state.checkIns || []).slice().sort();
+  var ci = (ST.checkIns||[]).slice().sort();
   if (!ci.length) return 0;
-  const today = new Date().toISOString().split('T')[0];
-  let streak = 0;
-  let date = new Date();
-  while(true) {
-    const iso = date.toISOString().split('T')[0];
-    if (ci.includes(iso)) { streak++; date.setDate(date.getDate()-1); }
-    else if (iso === today) { date.setDate(date.getDate()-1); }
+  var streak=0; var d=new Date();
+  for(;;) {
+    var iso=d.toISOString().split('T')[0];
+    if (ci.includes(iso)) { streak++; d.setDate(d.getDate()-1); }
+    else if (iso===today()) { d.setDate(d.getDate()-1); }
     else break;
   }
   return streak;
 }
 
-async function checkIn() {
-  const today = new Date().toISOString().split('T')[0];
-  if (!state.checkIns) state.checkIns = [];
-  if (state.checkIns.includes(today)) {
-    toast('Already checked in today! 🔥', 'info'); return;
-  }
-  state.checkIns.push(today);
-  await persistState('checkIns');
-  renderDashboard();
-  renderSchedule();
-  toast('Check in recorded! Streak: ' + calcStreak() + ' days 🔥', 'success');
+async function doCheckIn() {
+  var t = today();
+  if (!ST.checkIns) ST.checkIns=[];
+  if (ST.checkIns.includes(t)) { toast('Already checked in today! 🔥','info'); return; }
+  ST.checkIns.push(t);
+  await persist('checkIns');
+  renderDash(); renderSchedule();
+  toast('Checked in! Streak: '+calcStreak()+' days 🔥','success');
 }
 
-// ── TOPICS ───────────────────────────────────────────────
+// ── TOPICS ────────────────────────────────────────
 function renderTopics() {
-  const phaseFilter = document.getElementById('topicFilterPhase')?.value || '';
-  const statusFilter = document.getElementById('topicFilterStatus')?.value || '';
-  const container = document.getElementById('topicsContainer');
-  container.innerHTML = '';
-
-  PHASES.forEach(phase => {
-    if (phaseFilter && phase.id.toString() !== phaseFilter) return;
-    let topics = phase.topics;
-    if (statusFilter) topics = topics.filter(t => (state.topicStatus[t.id]||'todo') === statusFilter);
+  var fp = (document.getElementById('fPhase')||{}).value||'';
+  var fs = (document.getElementById('fStatus')||{}).value||'';
+  var wrap = document.getElementById('topicsWrap'); wrap.innerHTML='';
+  PHASES.forEach(function(ph) {
+    if (fp && ph.id.toString()!==fp) return;
+    var topics = ph.topics;
+    if (fs) topics=topics.filter(function(t){return (ST.topicStatus[t.id]||'todo')===fs});
     if (!topics.length) return;
-
-    const done = phase.topics.filter(t => state.topicStatus[t.id] === 'done').length;
-    const pct = Math.round(done/phase.topics.length*100);
-
-    const phaseEl = document.createElement('div');
-    phaseEl.style.marginBottom = '12px';
-    phaseEl.innerHTML = `
-      <div class="phase-header" onclick="togglePhase(${phase.id})">
-        <div class="phase-title" style="color:${phase.color}">Phase ${phase.id}: ${phase.name}</div>
-        <div class="phase-badge">${done}/${phase.topics.length}</div>
-        <div class="phase-progress-mini"><div style="height:100%;width:${pct}%;background:${phase.color};border-radius:99px"></div></div>
-        <div class="phase-chevron open" id="chevron-${phase.id}">▶</div>
-      </div>
-      <div class="topics-grid" id="topics-phase-${phase.id}">
-        ${topics.map(t => renderTopicCard(t, phase)).join('')}
-      </div>`;
-    container.appendChild(phaseEl);
+    var done=ph.topics.filter(function(t){return ST.topicStatus[t.id]==='done'}).length;
+    var pct=Math.round(done/ph.topics.length*100);
+    var div=document.createElement('div'); div.style.marginBottom='12px';
+    div.innerHTML='<div class="phase-header" onclick="togglePhase('+ph.id+')">'
+      +'<div class="phase-title" style="color:'+ph.color+'">Phase '+ph.id+': '+ph.name+'</div>'
+      +'<div class="phase-badge">'+done+'/'+ph.topics.length+'</div>'
+      +'<div class="phase-prog"><div style="height:100%;width:'+pct+'%;background:'+ph.color+';border-radius:99px"></div></div>'
+      +'<div class="phase-chev open" id="chev'+ph.id+'">▶</div></div>'
+      +'<div class="topics-grid" id="tg'+ph.id+'">'
+      +topics.map(function(t){return topicCard(t,ph)}).join('')+'</div>';
+    wrap.appendChild(div);
   });
 }
 
-function renderTopicCard(t, phase) {
-  const status = state.topicStatus[t.id] || 'todo';
-  return `
-    <div class="topic-card ${status}" onclick="openTopicModal('${t.id}')">
-      <div class="topic-top">
-        <div class="topic-status"></div>
-        <div class="topic-name">${t.name}</div>
-        <div class="topic-hrs">${t.hrs}h</div>
-      </div>
-      <div class="topic-meta">
-        <span class="tag phase${phase.id}">Phase ${phase.id}</span>
-        <span class="tag">${status === 'done' ? '✅ Done' : status === 'inprogress' ? '🔄 In Progress' : '⬜ To Do'}</span>
-      </div>
-    </div>`;
+function topicCard(t,ph) {
+  var st=ST.topicStatus[t.id]||'todo';
+  return '<div class="topic-card '+st+'" onclick="openTopic(\''+t.id+'\')"><div class="topic-top"><div class="topic-status"></div><div class="topic-name">'+t.name+'</div><div class="topic-hrs">'+t.hrs+'h</div></div><div class="topic-meta"><span class="tag p'+ph.id+'">Phase '+ph.id+'</span><span class="tag">'+(st==='done'?'✅ Done':st==='inprogress'?'🔄 In Progress':'⬜ To Do')+'</span></div></div>';
 }
 
 function togglePhase(id) {
-  const grid = document.getElementById('topics-phase-' + id);
-  const chev = document.getElementById('chevron-' + id);
-  const hidden = grid.style.display === 'none';
-  grid.style.display = hidden ? 'grid' : 'none';
-  chev.classList.toggle('open', hidden);
+  var g=document.getElementById('tg'+id), c=document.getElementById('chev'+id);
+  var h=g.style.display==='none'; g.style.display=h?'grid':'none'; c.classList.toggle('open',h);
 }
 
-let currentTopicId = null;
-function openTopicModal(id) {
-  const topic = PHASES.flatMap(p=>p.topics).find(t=>t.id===id);
-  const phase = PHASES.find(p=>p.topics.some(t=>t.id===id));
-  if (!topic) return;
-  currentTopicId = id;
-  document.getElementById('modalTopicPhase').textContent = `Phase ${phase.id}: ${phase.name}`;
-  document.getElementById('modalTopicName').textContent = topic.name;
-  document.getElementById('modalTopicDesc').textContent = topic.desc;
-  document.getElementById('modalTopicTags').innerHTML =
-    `<span class="tag phase${phase.id}">Phase ${phase.id}</span><span class="tag">⏱ ${topic.hrs}h</span>`;
-  const status = state.topicStatus[id] || 'todo';
-  document.getElementById('modalStatusBtns').innerHTML = `
-    <button class="btn ${status==='todo'?'btn-ghost':'btn-ghost'} btn-sm" onclick="setTopicStatus('${id}','todo')">⬜ To Do</button>
-    <button class="btn ${status==='inprogress'?'btn-primary':'btn-ghost'} btn-sm" onclick="setTopicStatus('${id}','inprogress')">🔄 In Progress</button>
-    <button class="btn ${status==='done'?'btn-success':'btn-ghost'} btn-sm" onclick="setTopicStatus('${id}','done')">✅ Done</button>
-  `;
+function openTopic(id) {
+  var t=allTopics().find(function(x){return x.id===id});
+  var ph=PHASES.find(function(p){return p.topics.some(function(x){return x.id===id})});
+  if(!t) return; activeTopic=id;
+  document.getElementById('mPhase').textContent='Phase '+ph.id+': '+ph.name;
+  document.getElementById('mName').textContent=t.name;
+  document.getElementById('mDesc').textContent=t.desc;
+  document.getElementById('mTags').innerHTML='<span class="tag p'+ph.id+'">Phase '+ph.id+'</span><span class="tag">⏱ '+t.hrs+'h</span>';
+  var st=ST.topicStatus[id]||'todo';
+  document.getElementById('mBtns').innerHTML=
+    '<button class="btn btn-ghost btn-sm" onclick="setStatus(\''+id+'\',\'todo\')">⬜ To Do</button>'
+    +'<button class="btn '+(st==='inprogress'?'btn-primary':'btn-ghost')+' btn-sm" onclick="setStatus(\''+id+'\',\'inprogress\')">🔄 In Progress</button>'
+    +'<button class="btn '+(st==='done'?'btn-success':'btn-ghost')+' btn-sm" onclick="setStatus(\''+id+'\',\'done\')">✅ Done</button>';
   document.getElementById('topicModal').classList.remove('hidden');
 }
 
-async function setTopicStatus(id, status) {
-  state.topicStatus[id] = status;
-  await persistState('topicStatus');
-  openTopicModal(id);
-  renderTopics();
-  renderDashboard();
-  toast(`Topic marked as ${status}`, 'success');
+async function setStatus(id,st) {
+  ST.topicStatus[id]=st;
+  await persist('topicStatus');
+  openTopic(id); renderTopics(); renderDash();
+  toast('Marked as '+st,'success');
 }
 
-function closeTopicModal() {
-  document.getElementById('topicModal').classList.add('hidden');
-  currentTopicId = null;
-}
+function closeTopicModal() { document.getElementById('topicModal').classList.add('hidden'); activeTopic=null; }
+document.getElementById('topicModal').addEventListener('click',function(e){if(e.target===this)closeTopicModal();});
 
-// ── GANTT ────────────────────────────────────────────────
+// ── GANTT ─────────────────────────────────────────
 function renderGantt() {
-  const startDate = state.startDate ? new Date(state.startDate) : new Date();
-  const totalWeeks = 24;
-  const today = new Date();
-  const daysSinceStart = Math.floor((today - startDate)/(1000*60*60*24));
-  const todayPct = Math.max(0, Math.min(100, daysSinceStart/(totalWeeks*7)*100));
-
+  var start = ST.startDate ? new Date(ST.startDate) : new Date();
+  var total=24, today_=new Date();
+  var daysSince=Math.floor((today_-start)/86400000);
+  var todayPct=Math.max(0,Math.min(100,daysSince/(total*7)*100));
   // Legend
-  const legend = document.getElementById('ganttLegend');
-  legend.innerHTML = PHASES.map(p => `
-    <div class="legend-item">
-      <div class="legend-dot" style="background:${p.color}"></div>
-      Phase ${p.id}: ${p.name.split('&')[0].trim()}
-    </div>`).join('') +
-    `<div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div>Today</div>`;
-
-  // Month headers
-  const months = [];
-  for(let w=0; w<totalWeeks; w++) {
-    const d = new Date(startDate);
-    d.setDate(d.getDate() + w*7);
-    const m = d.toLocaleDateString('en-IN',{month:'short'});
-    if (!months.length || months[months.length-1].name !== m)
-      months.push({ name: m, week: w, pct: (w/totalWeeks)*100 });
-  }
-
-  let ganttHtml = `<div style="position:relative">`;
-  // Headers
-  ganttHtml += `<div class="gantt-header">
-    <div class="gantt-label-col">Topic / Phase</div>
-    <div style="flex:1;position:relative;height:20px">
-      ${months.map(m => `<span class="gantt-month" style="position:absolute;left:${m.pct}%">${m.name}</span>`).join('')}
-    </div>
-  </div>`;
-
-  // Phase rows
-  PHASES.forEach(phase => {
-    const startPct = ((phase.weeks[0]-1)/totalWeeks)*100;
-    const widthPct = ((phase.weeks[1]-phase.weeks[0]+1)/totalWeeks)*100;
-    const phDone = phase.topics.filter(t=>state.topicStatus[t.id]==='done').length;
-    const phTotal = phase.topics.length;
-    const progWidth = (phDone/phTotal)*widthPct;
-
-    ganttHtml += `
-      <div class="gantt-row" title="${phase.name}: Wk${phase.weeks[0]}-${phase.weeks[1]}">
-        <div class="gantt-task-name" style="color:${phase.color};font-weight:600">Phase ${phase.id}</div>
-        <div class="gantt-track">
-          <div class="gantt-bar" style="left:${startPct}%;width:${widthPct}%;background:${phase.color}40;border:1px solid ${phase.color}">
-            <span style="position:absolute;left:0;top:0;bottom:0;width:${phDone/phTotal*100}%;background:${phase.color};border-radius:4px 0 0 4px"></span>
-            <span style="position:relative;z-index:2;font-size:10px;padding-left:6px">${phase.name.split('&')[0].trim()} — ${phDone}/${phTotal}</span>
-          </div>
-          <div class="gantt-today" style="left:${todayPct}%"></div>
-        </div>
-      </div>`;
+  var lg=document.getElementById('ganttLegend'); lg.innerHTML=
+    PHASES.map(function(p){return '<div class="legend-item"><div class="legend-dot" style="background:'+p.color+'"></div>Phase '+p.id+'</div>'}).join('')
+    +'<div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div>Today</div>';
+  // Chart
+  var months=[]; for(var w=0;w<total;w++){var d=new Date(start);d.setDate(d.getDate()+w*7);var m=d.toLocaleDateString('en-IN',{month:'short'});if(!months.length||months[months.length-1].n!==m)months.push({n:m,pct:(w/total)*100});}
+  var h='<div style="position:relative"><div class="gantt-header"><div class="gantt-label-col">Phase / Task</div><div style="flex:1;position:relative;height:20px">'
+    +months.map(function(m){return '<span style="position:absolute;left:'+m.pct+'%;font-size:11px;color:var(--txt2)">'+m.n+'</span>'}).join('')+'</div></div>';
+  PHASES.forEach(function(ph) {
+    var sp=((ph.weeks[0]-1)/total)*100, wp=((ph.weeks[1]-ph.weeks[0]+1)/total)*100;
+    var d=ph.topics.filter(function(t){return ST.topicStatus[t.id]==='done'}).length;
+    var dpct=(d/ph.topics.length)*100;
+    h+='<div class="gantt-row"><div class="gantt-task-name" style="color:'+ph.color+';font-weight:600">Phase '+ph.id+'</div>'
+      +'<div class="gantt-track"><div class="gantt-bar" style="left:'+sp+'%;width:'+wp+'%;background:'+ph.color+'30;border:1px solid '+ph.color+'">'
+      +'<span style="position:absolute;left:0;top:0;bottom:0;width:'+dpct+'%;background:'+ph.color+';border-radius:4px 0 0 4px;opacity:.7"></span>'
+      +'<span style="position:relative;z-index:2;padding-left:8px">'+ph.name.split('&')[0].trim()+' — '+d+'/'+ph.topics.length+'</span>'
+      +'</div><div class="gantt-today" style="left:'+todayPct+'%"></div></div></div>';
   });
-
-  // Milestone rows
-  MILESTONES.forEach(m => {
-    const pct = ((m.week-1)/totalWeeks)*100;
-    const phase = PHASES.find(p=>p.id===m.phase);
-    ganttHtml += `
-      <div class="gantt-row">
-        <div class="gantt-task-name" style="font-size:11px;color:var(--txt3)">${m.name}</div>
-        <div class="gantt-track" style="height:18px">
-          <div style="position:absolute;left:${pct}%;transform:translateX(-50%);top:2px;width:14px;height:14px;background:${phase?.color||'var(--amber)'};border-radius:50%;border:2px solid var(--bg);z-index:3" title="Wk ${m.week}: ${m.name}"></div>
-          <div class="gantt-today" style="left:${todayPct}%"></div>
-        </div>
-      </div>`;
+  MILESTONES.forEach(function(m) {
+    var pct=((m.week-1)/total)*100;
+    var ph=PHASES.find(function(p){return p.id===m.phase});
+    h+='<div class="gantt-row"><div class="gantt-task-name" style="font-size:11px;color:var(--txt3)">'+m.name+'</div>'
+      +'<div class="gantt-track" style="height:18px"><div style="position:absolute;left:'+pct+'%;transform:translateX(-50%);top:2px;width:14px;height:14px;background:'+(ph?ph.color:'var(--amber)')+';border-radius:50%;border:2px solid var(--bg);z-index:3"></div>'
+      +'<div class="gantt-today" style="left:'+todayPct+'%"></div></div></div>';
   });
-
-  ganttHtml += '</div>';
-  document.getElementById('ganttChart').innerHTML = ganttHtml;
-
+  h+='</div>';
+  document.getElementById('ganttChart').innerHTML=h;
   // Milestones list
-  const ml = document.getElementById('milestones');
-  const currentWeek = Math.ceil(daysSinceStart/7);
-  ml.innerHTML = MILESTONES.map(m => {
-    const done = currentWeek > m.week;
-    const current = currentWeek === m.week;
-    const phase = PHASES.find(p=>p.id===m.phase);
-    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
-      <div style="width:28px;height:28px;border-radius:50%;background:${done?phase?.color||'var(--green)':'var(--border)'};display:flex;align-items:center;justify-content:center;font-size:12px;min-width:28px">
-        ${done?'✓':current?'●':'○'}
-      </div>
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:500;color:${done?'var(--green)':current?'var(--accent)':'var(--txt)'}">${m.name}</div>
-        <div style="font-size:11px;color:var(--txt3)">Week ${m.week} — ${getWeekDateStr(m.week, startDate)}</div>
-      </div>
-      <div class="tag ${done?'phase3':current?'phase1':''}">${done?'Complete':current?'This Week':'Upcoming'}</div>
-    </div>`;
+  var curWk=Math.ceil(daysSince/7);
+  document.getElementById('mStones').innerHTML=MILESTONES.map(function(m){
+    var ph=PHASES.find(function(p){return p.id===m.phase});
+    var done=curWk>m.week, cur=curWk===m.week;
+    var d2=new Date(start); d2.setDate(d2.getDate()+(m.week-1)*7);
+    return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">'
+      +'<div style="width:28px;height:28px;border-radius:50%;background:'+(done?ph.color:'var(--border)')+';display:flex;align-items:center;justify-content:center;font-size:12px;min-width:28px">'+(done?'✓':cur?'●':'○')+'</div>'
+      +'<div style="flex:1"><div style="font-size:13px;font-weight:500;color:'+(done?'var(--green)':cur?'var(--accent)':'var(--txt)')+'">'+m.name+'</div>'
+      +'<div style="font-size:11px;color:var(--txt3)">Week '+m.week+' — '+d2.toLocaleDateString('en-IN',{month:'short',day:'numeric',year:'numeric'})+'</div></div>'
+      +'<div class="tag '+(done?'p3':cur?'p1':'')+'">'+(done?'Complete':cur?'This Week':'Upcoming')+'</div></div>';
   }).join('');
 }
 
-function getWeekDateStr(week, start) {
-  const d = new Date(start);
-  d.setDate(d.getDate() + (week-1)*7);
-  return d.toLocaleDateString('en-IN',{month:'short',day:'numeric',year:'numeric'});
-}
-
-// ── RESOURCES ────────────────────────────────────────────
-function filterResources(type) {
-  activeResourceFilter = type;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === type));
+// ── RESOURCES ─────────────────────────────────────
+function filterRes(btn, f) {
+  resFilter=f;
+  document.querySelectorAll('.filter-btn').forEach(function(b){b.classList.toggle('active',b===btn)});
   renderResources();
 }
 
 function renderResources() {
-  const grid = document.getElementById('resourcesGrid');
-  let res = [...(state.resources||[])];
-  if (activeResourceFilter) res = res.filter(r => r.type === activeResourceFilter);
-
-  if (!res.length) {
-    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🔗</div><p>No resources found. Add one above!</p></div>';
-    return;
-  }
-
-  const icons = { link:'🔗', pdf:'📄', video:'🎬', course:'🎓', book:'📖', tool:'🛠️' };
-  grid.innerHTML = res.map(r => `
-    <div class="resource-item">
-      <div class="resource-top">
-        <div class="resource-icon">${icons[r.type]||'🔗'}</div>
-        <div style="flex:1">
-          <div class="resource-title">${r.title}</div>
-          ${r.phase ? `<span class="tag phase${r.phase}" style="margin-top:4px;display:inline-block">Phase ${r.phase}</span>` : ''}
-        </div>
-      </div>
-      ${r.desc ? `<div class="resource-desc">${r.desc}</div>` : ''}
-      <div class="resource-actions">
-        ${r.url ? `<a class="resource-link" href="${r.url}" target="_blank">🔗 Open →</a>` : ''}
-        <span style="flex:1"></span>
-        <button class="btn btn-ghost btn-sm" onclick="deleteResource('${r.id}')">🗑</button>
-      </div>
-    </div>`).join('');
+  var g=document.getElementById('resGrid');
+  var res=(ST.resources||[]).filter(function(r){return !resFilter||r.type===resFilter});
+  if (!res.length) { g.innerHTML='<div class="empty-state"><div class="ei">🔗</div><p>No resources. Add one above!</p></div>'; return; }
+  var icons={link:'🔗',pdf:'📄',video:'🎬',course:'🎓',book:'📖',tool:'🛠️'};
+  g.innerHTML=res.map(function(r){
+    return '<div class="resource-item"><div style="display:flex;align-items:flex-start;gap:10px"><span style="font-size:20px">'+(icons[r.type]||'🔗')+'</span><div style="flex:1"><div class="resource-title">'+r.title+'</div>'+(r.phase?'<span class="tag p'+r.phase+'" style="margin-top:4px;display:inline-block">Phase '+r.phase+'</span>':'')+'</div></div>'+(r.desc?'<div style="font-size:12px;color:var(--txt2)">'+r.desc+'</div>':'')+'<div style="display:flex;gap:8px;margin-top:4px">'+(r.url?'<a class="resource-link" href="'+r.url+'" target="_blank">🔗 Open →</a>':'')+'<span style="flex:1"></span><button class="btn btn-ghost btn-sm" onclick="delRes(\''+r.id+'\')">🗑</button></div></div>';
+  }).join('');
 }
 
-function toggleAddResource() {
-  const f = document.getElementById('addResourceForm');
-  f.classList.toggle('show');
-}
+function toggleForm(id) { document.getElementById(id).classList.toggle('show'); }
 
 async function saveResource() {
-  const title = document.getElementById('resTitle').value.trim();
-  if (!title) { toast('Title is required', 'error'); return; }
-  const res = {
-    id: 'r' + Date.now(),
-    title,
-    type: document.getElementById('resType').value,
-    url: document.getElementById('resUrl').value.trim(),
-    phase: document.getElementById('resPhase').value,
-    desc: document.getElementById('resDesc').value.trim(),
-  };
-  if (!state.resources) state.resources = [];
-  state.resources.push(res);
-  await persistState('resources');
+  var title=(document.getElementById('rTitle').value||'').trim();
+  if (!title) { toast('Title required','error'); return; }
+  if (!ST.resources) ST.resources=[];
+  ST.resources.push({id:'r'+Date.now(),title:title,type:document.getElementById('rType').value,url:(document.getElementById('rUrl').value||'').trim(),phase:document.getElementById('rPhase').value,desc:(document.getElementById('rDesc').value||'').trim()});
+  await persist('resources');
   renderResources();
-  toggleAddResource();
-  // Reset form
-  ['resTitle','resUrl','resDesc'].forEach(id => document.getElementById(id).value = '');
-  toast('Resource saved!', 'success');
+  toggleForm('addResForm');
+  ['rTitle','rUrl','rDesc'].forEach(function(id){document.getElementById(id).value='';});
+  toast('Resource saved!','success');
 }
 
-async function deleteResource(id) {
-  state.resources = state.resources.filter(r => r.id !== id);
-  await persistState('resources');
+async function delRes(id) {
+  ST.resources=ST.resources.filter(function(r){return r.id!==id});
+  await persist('resources');
   renderResources();
-  toast('Resource deleted', 'info');
+  toast('Deleted','info');
 }
 
-// ── NOTES ────────────────────────────────────────────────
-function renderNotesList() {
-  const query = document.getElementById('noteSearch')?.value?.toLowerCase() || '';
-  const list = document.getElementById('notesList');
-  const notes = (state.notes || []).filter(n =>
-    n.title?.toLowerCase().includes(query) || n.body?.toLowerCase().includes(query)
-  ).sort((a,b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-
-  if (!notes.length) {
-    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--txt3);font-size:12px">No notes yet.<br>Create one with + New</div>';
-    return;
-  }
-  list.innerHTML = notes.map(n => `
-    <div class="note-item ${n.id===currentNoteId?'active':''}" onclick="openNote('${n.id}')">
-      <div class="note-item-title">${n.title||'Untitled'}</div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <div class="note-item-date">${new Date(n.updatedAt).toLocaleDateString('en-IN',{month:'short',day:'numeric'})}</div>
-        ${n.tag ? `<div class="note-item-tag">${n.tag}</div>` : ''}
-      </div>
-    </div>`).join('');
+// ── NOTES ─────────────────────────────────────────
+function renderNotes() {
+  var q=(document.getElementById('noteSearch')||{}).value||'';
+  q=q.toLowerCase();
+  var list=document.getElementById('notesList');
+  var notes=(ST.notes||[]).filter(function(n){return !q||((n.title||'').toLowerCase().includes(q)||(n.body||'').toLowerCase().includes(q))});
+  notes.sort(function(a,b){return new Date(b.updatedAt)-new Date(a.updatedAt)});
+  if (!notes.length) { list.innerHTML='<div style="text-align:center;padding:20px;color:var(--txt3);font-size:12px">No notes yet.<br>Create one with + New</div>'; return; }
+  list.innerHTML=notes.map(function(n){
+    return '<div class="note-item '+(n.id===activeNote?'active':'')+'" onclick="openNote(\''+n.id+'\')"><div class="note-item-title">'+(n.title||'Untitled')+'</div><div style="display:flex;gap:8px;align-items:center"><div class="note-item-date">'+new Date(n.updatedAt).toLocaleDateString('en-IN',{month:'short',day:'numeric'})+'</div>'+(n.tag?'<div style="font-size:10px;color:var(--accent);font-weight:600">'+n.tag+'</div>':'')+'</div></div>';
+  }).join('');
 }
 
 function newNote() {
-  const note = { id: 'n' + Date.now(), title: '', body: '', tag: '', updatedAt: new Date().toISOString() };
-  if (!state.notes) state.notes = [];
-  state.notes.unshift(note);
-  currentNoteId = note.id;
-  renderNotesList();
-  loadNoteEditor(note);
+  var n={id:'n'+Date.now(),title:'',body:'',tag:'',updatedAt:new Date().toISOString()};
+  if (!ST.notes) ST.notes=[];
+  ST.notes.unshift(n); activeNote=n.id;
+  renderNotes(); loadEditor(n);
 }
 
 function openNote(id) {
-  const note = state.notes.find(n=>n.id===id);
-  if (!note) return;
-  currentNoteId = id;
-  renderNotesList();
-  loadNoteEditor(note);
+  var n=ST.notes.find(function(x){return x.id===id});
+  if (!n) return; activeNote=id; renderNotes(); loadEditor(n);
 }
 
-function loadNoteEditor(note) {
-  document.getElementById('noteEditorEmpty').style.display = 'none';
-  document.getElementById('noteEditorContent').style.display = 'flex';
-  document.getElementById('noteTitleInput').value = note.title || '';
-  document.getElementById('noteBody').value = note.body || '';
-  document.getElementById('notePhaseTag').value = note.tag || '';
-  updateWordCount();
-  setPreviewMode(false);
+function loadEditor(n) {
+  document.getElementById('noteEmpty').style.display='none';
+  document.getElementById('noteContent').style.display='flex';
+  document.getElementById('nTitle').value=n.title||'';
+  document.getElementById('nBody').value=n.body||'';
+  document.getElementById('nTag').value=n.tag||'';
+  countWords(); setPrev(false);
 }
 
 function debounceSave() {
-  updateWordCount();
-  document.getElementById('noteSaveStatus').textContent = 'Saving...';
+  countWords();
+  document.getElementById('nSaveStatus').textContent='Saving...';
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveCurrentNote, 800);
+  saveTimer=setTimeout(saveNote,800);
 }
 
-async function saveCurrentNote() {
-  if (!currentNoteId) return;
-  const note = state.notes.find(n=>n.id===currentNoteId);
-  if (!note) return;
-  note.title = document.getElementById('noteTitleInput').value;
-  note.body = document.getElementById('noteBody').value;
-  note.tag = document.getElementById('notePhaseTag').value;
-  note.updatedAt = new Date().toISOString();
-  await persistState('notes');
-  renderNotesList();
-  document.getElementById('noteSaveStatus').textContent = 'All changes saved · ' + new Date().toLocaleTimeString();
+async function saveNote() {
+  if (!activeNote) return;
+  var n=ST.notes.find(function(x){return x.id===activeNote});
+  if (!n) return;
+  n.title=document.getElementById('nTitle').value;
+  n.body=document.getElementById('nBody').value;
+  n.tag=document.getElementById('nTag').value;
+  n.updatedAt=new Date().toISOString();
+  await persist('notes');
+  renderNotes();
+  document.getElementById('nSaveStatus').textContent='Saved · '+new Date().toLocaleTimeString();
 }
 
-async function deleteNote() {
-  if (!currentNoteId) return;
-  state.notes = state.notes.filter(n=>n.id!==currentNoteId);
-  currentNoteId = null;
-  await persistState('notes');
-  renderNotesList();
-  document.getElementById('noteEditorEmpty').style.display = 'block';
-  document.getElementById('noteEditorContent').style.display = 'none';
-  toast('Note deleted', 'info');
+async function delNote() {
+  if (!activeNote) return;
+  ST.notes=ST.notes.filter(function(n){return n.id!==activeNote});
+  activeNote=null;
+  await persist('notes');
+  renderNotes();
+  document.getElementById('noteEmpty').style.display='block';
+  document.getElementById('noteContent').style.display='none';
+  toast('Note deleted','info');
 }
 
-function insertMd(before, after) {
-  const ta = document.getElementById('noteBody');
-  const start = ta.selectionStart, end = ta.selectionEnd;
-  const sel = ta.value.substring(start, end);
-  ta.value = ta.value.substring(0,start) + before + sel + after + ta.value.substring(end);
-  ta.focus();
-  ta.selectionStart = start + before.length;
-  ta.selectionEnd = end + before.length;
+function ins(b,a) {
+  var ta=document.getElementById('nBody');
+  var s=ta.selectionStart,e=ta.selectionEnd,sel=ta.value.substring(s,e);
+  ta.value=ta.value.substring(0,s)+b+sel+a+ta.value.substring(e);
+  ta.focus(); ta.selectionStart=s+b.length; ta.selectionEnd=e+b.length;
   debounceSave();
 }
 
-function togglePreview() {
-  setPreviewMode(!previewMode);
+function togglePreview() { setPrev(!prevMode); }
+function setPrev(v) {
+  prevMode=v;
+  var body=document.getElementById('nBody'), prev=document.getElementById('nPreview'), btn=document.getElementById('prevBtn');
+  if (v) { prev.innerHTML=marked.parse(body.value||''); body.style.display='none'; prev.style.display='block'; btn.textContent='✏️ Edit'; }
+  else { body.style.display='block'; prev.style.display='none'; btn.textContent='👁 Preview'; }
 }
 
-function setPreviewMode(val) {
-  previewMode = val;
-  const body = document.getElementById('noteBody');
-  const prev = document.getElementById('notePreview');
-  const btn = document.getElementById('previewBtn');
-  if (previewMode) {
-    prev.innerHTML = marked.parse(body.value || '');
-    body.style.display = 'none'; prev.style.display = 'block';
-    btn.textContent = '✏️ Edit';
-  } else {
-    body.style.display = 'block'; prev.style.display = 'none';
-    btn.textContent = '👁 Preview';
-  }
+function countWords() {
+  var v=(document.getElementById('nBody')||{}).value||'';
+  document.getElementById('nWords').textContent=v.trim().split(/\s+/).filter(Boolean).length+' words';
 }
 
-function updateWordCount() {
-  const body = document.getElementById('noteBody');
-  const words = body.value.trim().split(/\s+/).filter(w=>w).length;
-  document.getElementById('noteWordCount').textContent = words + ' words';
-}
-
-// ── SCHEDULE ─────────────────────────────────────────────
+// ── SCHEDULE ──────────────────────────────────────
 function renderSchedule() {
-  // Week grid
-  const today = new Date();
-  const dow = today.getDay();
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - (dow===0?6:dow-1));
-  const ci = state.checkIns || [];
-
-  const wg = document.getElementById('weekGrid');
-  wg.innerHTML = Array.from({length:7}, (_,i) => {
-    const d = new Date(weekStart);
-    d.setDate(weekStart.getDate()+i);
-    const iso = d.toISOString().split('T')[0];
-    const isToday = iso === today.toISOString().split('T')[0];
-    const isDone = ci.includes(iso);
-    const isWeekend = d.getDay()===0||d.getDay()===6;
-    const names = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-    return `<div class="day-card ${isToday?'today':''} ${isWeekend?'weekend':''} ${isDone?'done':''}">
-      <div class="day-name">${names[i]}</div>
-      <div class="day-date">${d.getDate()}</div>
-      <div class="day-hours">${isWeekend?'2h':'1.5h'}</div>
-      <div class="day-status ${isDone?'done':''}"></div>
-    </div>`;
+  var now=new Date(); var ci=ST.checkIns||[];
+  var ws=new Date(now); ws.setDate(now.getDate()-(now.getDay()||7)+1);
+  var names=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  document.getElementById('weekGrid').innerHTML=names.map(function(name,i){
+    var d=new Date(ws); d.setDate(ws.getDate()+i);
+    var iso=d.toISOString().split('T')[0];
+    var isTod=iso===today(),isDone=ci.includes(iso),isWE=d.getDay()===0||d.getDay()===6;
+    return '<div class="day-card'+(isTod?' today':'')+(isWE?' weekend':'')+(isDone?' checked':'')+'"><div class="day-name">'+name+'</div><div class="day-date">'+d.getDate()+'</div><div class="day-hours">'+(isWE?'2h':'1.5h')+'</div><div class="day-dot'+(isDone?' checked':'')+'"></div></div>';
   }).join('');
-
-  // Daily plan
-  document.getElementById('dailyPlan').innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:8px">
-      <div style="background:var(--surface);border-radius:8px;padding:12px">
-        <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:6px">⏰ WEEKDAY SESSION (1.5h)</div>
-        <div style="font-size:12px;color:var(--txt2);display:flex;flex-direction:column;gap:4px">
-          <div>• 0–10 min: Review yesterday's topic (spaced repetition)</div>
-          <div>• 10–65 min: New topic study / hands-on practice</div>
-          <div>• 65–80 min: Take notes & summarize in your own words</div>
-          <div>• 80–90 min: Update dashboard progress</div>
-        </div>
-      </div>
-      <div style="background:var(--surface);border-radius:8px;padding:12px">
-        <div style="font-size:12px;font-weight:600;color:var(--purple);margin-bottom:6px">🗓️ WEEKEND SESSION (2h)</div>
-        <div style="font-size:12px;color:var(--txt2);display:flex;flex-direction:column;gap:4px">
-          <div>• 0–10 min: Weekly review — what did I learn?</div>
-          <div>• 10–70 min: Deeper dive / project / coding exercise</div>
-          <div>• 70–100 min: Watch a SAP video / tutorial</div>
-          <div>• 100–120 min: Community engagement / resource curation</div>
-        </div>
-      </div>
-    </div>`;
-
-  // Tips
-  const tip = STUDY_TIPS[Math.floor(Math.random() * STUDY_TIPS.length)];
-  const tip2 = STUDY_TIPS[(Math.floor(Math.random() * STUDY_TIPS.length) + 1) % STUDY_TIPS.length];
-  document.getElementById('studyTips').innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:10px">
-      ${[tip, tip2].map(t=>`<div style="background:var(--surface);border-radius:8px;padding:12px;font-size:13px;color:var(--txt2);line-height:1.5">${t}</div>`).join('')}
-      <div style="background:rgba(14,165,233,.08);border:1px solid rgba(14,165,233,.2);border-radius:8px;padding:12px">
-        <div style="font-size:11px;font-weight:600;color:var(--accent);margin-bottom:4px">📊 TOTAL HOURS/WEEK</div>
-        <div style="font-size:13px;color:var(--txt2)">Weekdays: 5 × 1.5h = <strong>7.5h</strong><br>Weekends: 2 × 2h = <strong>4h</strong><br>Total: <strong>11.5h/week · 276h over 24 weeks</strong></div>
-      </div>
-    </div>`;
+  document.getElementById('dailyPlan').innerHTML=
+    '<div style="display:flex;flex-direction:column;gap:8px">'
+    +'<div style="background:var(--surface);border-radius:8px;padding:12px"><div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:6px">⏰ WEEKDAY (1.5h)</div><div style="font-size:12px;color:var(--txt2);line-height:1.8">• 0–10 min: Review yesterday (spaced repetition)<br>• 10–65 min: New topic study / hands-on<br>• 65–80 min: Take notes in own words<br>• 80–90 min: Update dashboard progress</div></div>'
+    +'<div style="background:var(--surface);border-radius:8px;padding:12px"><div style="font-size:12px;font-weight:600;color:var(--purple);margin-bottom:6px">🗓️ WEEKEND (2h)</div><div style="font-size:12px;color:var(--txt2);line-height:1.8">• 0–10 min: Weekly review — what did I learn?<br>• 10–70 min: Deeper dive / project / coding<br>• 70–100 min: SAP video / tutorial<br>• 100–120 min: Community / resource curation</div></div>'
+    +'<div style="background:rgba(14,165,233,.08);border:1px solid rgba(14,165,233,.2);border-radius:8px;padding:12px"><div style="font-size:11px;font-weight:600;color:var(--accent);margin-bottom:4px">📊 TOTAL/WEEK</div><div style="font-size:12px;color:var(--txt2)">5 × 1.5h = <b>7.5h</b> · 2 × 2h = <b>4h</b> · Total <b>11.5h/week</b></div></div></div>';
+  var t1=TIPS[Math.floor(Math.random()*TIPS.length)],t2=TIPS[(Math.floor(Math.random()*TIPS.length)+2)%TIPS.length];
+  document.getElementById('studyTips').innerHTML='<div style="display:flex;flex-direction:column;gap:10px">'
+    +[t1,t2].map(function(t){return '<div style="background:var(--surface);border-radius:8px;padding:12px;font-size:13px;color:var(--txt2);line-height:1.5">'+t+'</div>'}).join('')+'</div>';
 }
 
-// ── TOAST ────────────────────────────────────────────────
-function toast(msg, type='info') {
-  const c = document.getElementById('toastContainer');
-  const t = document.createElement('div');
-  t.className = 'toast ' + type;
-  const icons = { success:'✅', error:'❌', info:'ℹ️' };
-  t.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
-  c.appendChild(t);
-  setTimeout(() => t.remove(), 4000);
+// ── TOAST ─────────────────────────────────────────
+function toast(msg,type) {
+  var c=document.getElementById('toasts');
+  var t=document.createElement('div'); t.className='toast '+(type||'info');
+  var ic={success:'✅',error:'❌',info:'ℹ️'};
+  t.innerHTML='<span>'+(ic[type]||'ℹ️')+'</span><span>'+msg+'</span>';
+  c.appendChild(t); setTimeout(function(){t.remove()},4000);
 }
-
-// ── SQL COPY ─────────────────────────────────────────────
-function copySQLSchema() {
-  navigator.clipboard.writeText(SQL_SCHEMA).then(() => toast('SQL copied to clipboard!', 'success'));
-}
-
-// ── CLOSE MODALS ON BACKDROP ─────────────────────────────
-document.getElementById('topicModal').addEventListener('click', function(e) {
-  if (e.target === this) closeTopicModal();
-});
-
-// ── START ────────────────────────────────────────────────
-init();
 </script>
 </body>
 </html>
